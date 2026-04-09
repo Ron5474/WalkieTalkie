@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+chromadb
+sqlalchemy
+ollama
+requests
+beautifulsoup4
