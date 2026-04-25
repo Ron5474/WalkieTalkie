@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 import config
@@ -65,6 +65,13 @@ class HolidayBriefingRequest(BaseModel):
     city: str
     start_date: Optional[str] = None  # YYYY-MM-DD
     days: int = 1
+
+
+class WalkStoryRequest(BaseModel):
+    city: str
+    place_title: str
+    anecdote: str
+    llm_tier: Optional[str] = "small"
 
 
 class SignInRequest(BaseModel):
@@ -149,26 +156,39 @@ def _normalize_tier_value(raw_tier: str | None) -> str:
     return "large"
 
 
+def _tier_model_candidates(tier: str) -> list[str]:
+    if config.force_ollama_fallback():
+        return [config.OLLAMA_LARGE_LLM_MODEL if tier == "large" else config.OLLAMA_SMALL_LLM_MODEL]
+    if tier == "large":
+        return [
+            config.LARGE_LLM_MODEL,
+            config.LARGE_LLM_FALLBACK_MODEL,
+            config.OLLAMA_LARGE_LLM_MODEL,
+        ]
+    return [config.SMALL_LLM_MODEL, config.OLLAMA_SMALL_LLM_MODEL]
+
+
 async def _invoke_itinerary_model(prompt: str, tier: str) -> str:
     """
-    Invoke itinerary model with timeout and one retry.
+    Invoke itinerary model and wait for provider response.
     """
-    timeout_s = max(5.0, float(config.itinerary_timeout_seconds()))
     model_tiers = [tier, tier]
+    model_candidates = _tier_model_candidates(tier)
+    provider_mode = "ollama_only" if config.force_ollama_fallback() else "openrouter_with_fallbacks"
+    print(
+        f">>> [ITINERARY GENERATION] model route | tier={tier} | mode={provider_mode} | "
+        f"candidates={model_candidates}"
+    )
     last_err = None
     for attempt_idx, model_tier in enumerate(model_tiers, start=1):
         try:
+            print(
+                f">>> [ITINERARY GENERATION] attempt={attempt_idx} invoking tier={model_tier} "
+                f"(fallback chain may apply inside LLM client)"
+            )
             llm = get_chat_llm(model_tier)
-            resp = await asyncio.wait_for(
-                llm.ainvoke([HumanMessage(content=prompt)]),
-                timeout=timeout_s,
-            )
+            resp = await llm.ainvoke([HumanMessage(content=prompt)])
             return (resp.content or "").strip()
-        except asyncio.TimeoutError as e:
-            last_err = RuntimeError(
-                f"timed out after {timeout_s:.1f}s (attempt {attempt_idx}, tier={model_tier})"
-            )
-            print(f">>> [ITINERARY GENERATION] {last_err}")
         except Exception as e:
             last_err = e
             print(
@@ -317,6 +337,8 @@ async def synthesize_itinerary(req: ItineraryRequest):
         }
 
     itinerary_tier = _normalize_tier_value(req.llm_tier)
+    itinerary_candidates = _tier_model_candidates(itinerary_tier)
+    provider_mode = "ollama_only" if config.force_ollama_fallback() else "openrouter_with_fallbacks"
     print(f"\n--- ITINERARY {req.days} days | {req.city} | {req.dates} | tier={itinerary_tier} ---")
 
     static_history = scrape_static_history.invoke(req.city)
@@ -399,13 +421,28 @@ Output ONLY valid JSON inside the <final_answer> block. No markdown around the J
             day["plan"] = unique_plan
         _normalize_eats_quota(nodes, max_ratio=0.25)
 
+        nodes["_debug"] = {
+            "tier": itinerary_tier,
+            "provider_mode": provider_mode,
+            "model_candidates": itinerary_candidates,
+        }
         return nodes
     except Exception as e:
         import traceback
 
         print("JSON Synthesis Error:")
         print(traceback.format_exc())
-        return {"places": [], "eats": [], "itinerary": [], "error": str(e)}
+        return {
+            "places": [],
+            "eats": [],
+            "itinerary": [],
+            "error": str(e),
+            "_debug": {
+                "tier": itinerary_tier,
+                "provider_mode": provider_mode,
+                "model_candidates": itinerary_candidates,
+            },
+        }
 
 
 @app.post("/api/holiday-briefing")
@@ -464,6 +501,50 @@ Keep total under 260 words. Friendly, practical tone. No markdown # headers."""
         "web_context": str(web)[:2000],
         "search_query": search_q,
     }
+
+
+@app.post("/api/walk-story")
+async def walk_story(req: WalkStoryRequest):
+    """
+    Generate a short, vivid walk narration in the main assistant persona.
+    This ensures spoken stop stories match the same persona style as chat.
+    """
+    city = (req.city or "").strip() or "this city"
+    place = (req.place_title or "").strip()
+    anecdote = (req.anecdote or "").strip()
+    tier = _normalize_tier_value(req.llm_tier)
+    if not place:
+        return {"story": "", "error": "place_title is required"}
+
+    prompt = f"""Create a spoken walking narration for a traveler standing near this place.
+City: {city}
+Place: {place}
+Known local context:
+{anecdote}
+
+Requirements:
+- 80-150 words.
+- Conversational and vivid (not robotic).
+- Mention one physical detail to notice right now.
+- Include one "I bet you didn't know" style historical/cultural detail.
+- End with exactly one sentence labeled "Local Secret:".
+- Do not use markdown.
+"""
+    try:
+        llm = get_chat_llm(tier)
+        out = await llm.ainvoke(
+            [
+                SystemMessage(content=build_system_prompt()),
+                HumanMessage(content=prompt),
+            ]
+        )
+        story = (out.content or "").strip()
+        if not story:
+            story = f"You're at {place}. {anecdote}".strip()
+        return {"story": story, "model_tier": tier}
+    except Exception as e:
+        fallback = f"You're at {place}. {anecdote}".strip()
+        return {"story": fallback, "model_tier": tier, "error": repr(e)}
 
 
 @app.get("/")

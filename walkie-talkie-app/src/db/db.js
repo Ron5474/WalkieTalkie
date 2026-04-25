@@ -2,13 +2,22 @@ import { openDB } from 'idb';
 
 const DB_NAME = 'WalkieTalkieVault';
 const STORE_NAME = 'nodes';
+let sfDefaultsPromise = null;
+
+async function loadSanFranciscoDefaultStops() {
+    if (!sfDefaultsPromise) {
+        sfDefaultsPromise = import('../data/mockNodes.js')
+            .then((m) => (Array.isArray(m.mockNodes) ? m.mockNodes : []))
+            .catch(() => []);
+    }
+    return sfDefaultsPromise;
+}
 
 /** Original SF Chinatown walking stops (hero demo); merged after SF itinerary sync so they stay available. */
-async function mergeSanFranciscoDefaultStops(tx) {
-    const { mockNodes } = await import('../data/mockNodes.js');
-    for (const raw of mockNodes) {
+async function mergeSanFranciscoDefaultStops(tx, defaultStops) {
+    for (const raw of defaultStops) {
         if (!raw || !raw.id) continue;
-        tx.store.put({
+        await tx.store.put({
             ...raw,
             visited: false,
             lastVisited: null,
@@ -24,8 +33,9 @@ export async function ensureDefaultWalkNodesForCity(city) {
     const all = await db.getAll(STORE_NAME);
     const walkNodes = all.filter((n) => n.id !== 'SYSTEM_ITINERARY_MAPPING');
     if (walkNodes.length > 0) return;
+    const defaultStops = await loadSanFranciscoDefaultStops();
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    await mergeSanFranciscoDefaultStops(tx);
+    await mergeSanFranciscoDefaultStops(tx, defaultStops);
     await tx.done;
 }
 
@@ -37,8 +47,9 @@ export async function ensureSanFranciscoDemoStopsPresent() {
     const db = await initDB();
     const probe = await db.get(STORE_NAME, 'sf_chinatown_dragons_gate');
     if (probe) return;
+    const defaultStops = await loadSanFranciscoDefaultStops();
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    await mergeSanFranciscoDefaultStops(tx);
+    await mergeSanFranciscoDefaultStops(tx, defaultStops);
     await tx.done;
 }
 
@@ -65,6 +76,10 @@ export async function fetchDynamicNodes(city, dates, days, budget, llmTier = 'la
             body: JSON.stringify({ city, dates, days, budget, llm_tier: llmTier })
         });
         const dynamicPayload = await response.json();
+        const backendError = dynamicPayload?.error ? String(dynamicPayload.error) : "";
+        const debug = dynamicPayload?._debug || null;
+        const placesLen = Array.isArray(dynamicPayload?.places) ? dynamicPayload.places.length : 0;
+        const itineraryLen = Array.isArray(dynamicPayload?.itinerary) ? dynamicPayload.itinerary.length : 0;
         
         if (
             dynamicPayload &&
@@ -72,6 +87,9 @@ export async function fetchDynamicNodes(city, dates, days, budget, llmTier = 'la
             Array.isArray(dynamicPayload.itinerary) &&
             dynamicPayload.itinerary.length > 0
         ) {
+            const defaultStops = city === 'San Francisco'
+                ? await loadSanFranciscoDefaultStops()
+                : [];
             const tx = db.transaction(STORE_NAME, 'readwrite');
             
             // Clear existing nodes before overwriting to prevent ID conflicts from changing cities
@@ -96,16 +114,34 @@ export async function fetchDynamicNodes(city, dates, days, budget, llmTier = 'la
             });
 
             if (city === 'San Francisco') {
-                await mergeSanFranciscoDefaultStops(tx);
+                await mergeSanFranciscoDefaultStops(tx, defaultStops);
             }
 
             await tx.done;
-            return true;
+            return {
+                ok: true,
+                error: null,
+                debug,
+                counts: { places: placesLen, itineraryDays: itineraryLen },
+            };
         }
+        return {
+            ok: false,
+            error: backendError || "Backend returned no itinerary days.",
+            debug,
+            counts: { places: placesLen, itineraryDays: itineraryLen },
+            raw: JSON.stringify(dynamicPayload).slice(0, 1200),
+        };
     } catch (e) {
         console.error("Failed to fetch dynamic itinerary nodes:", e);
+        return {
+            ok: false,
+            error: String(e),
+            debug: null,
+            counts: { places: 0, itineraryDays: 0 },
+            raw: "",
+        };
     }
-    return false;
 }
 
 export async function getUnvisitedNodes() {

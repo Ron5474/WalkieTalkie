@@ -262,20 +262,56 @@ export default function WalkieTalkie() {
 
   const handleGenerateItinerary = async () => {
     setLoading(true);
+    updateCurrentCityMessages(prev => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `Waiting for the ${llmTier} itinerary model for ${selectedCity}...`,
+      },
+    ]);
     const { fetchDynamicNodes, getUnvisitedNodes, getSystemMapping } = await import('./db/db.js');
     try {
-        const ok = await fetchDynamicNodes(selectedCity, travelDates, numDays, budget, llmTier);
+        const result = await fetchDynamicNodes(selectedCity, travelDates, numDays, budget, llmTier);
         const unvisited = await getUnvisitedNodes();
         const mapping = await getSystemMapping();
         setActionPlan(unvisited);
         setItineraryMap(mapping);
-        if (ok && Array.isArray(mapping) && mapping.length > 0) {
-          updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: `I've generated a ${numDays}-day itinerary for ${selectedCity}. Switch to Holiday Mode → Day-to-Day to see each day.` }]);
+        if (result?.ok && Array.isArray(mapping) && mapping.length > 0) {
+          updateCurrentCityMessages(prev => [
+            ...prev,
+            {
+              role: "assistant",
+              content:
+                `I've generated a ${numDays}-day itinerary for ${selectedCity}. ` +
+                `Switch to Holiday Mode → Day-to-Day to see each day.\n` +
+                `Debug: tier=${result?.debug?.tier || llmTier}, mode=${result?.debug?.provider_mode || "unknown"}, ` +
+                `candidates=${(result?.debug?.model_candidates || []).join(", ") || "n/a"}, ` +
+                `places=${result?.counts?.places ?? "?"}, days=${result?.counts?.itineraryDays ?? "?"}`,
+            },
+          ]);
         } else {
-          updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: "I couldn't generate a valid day plan for that request. Please try again, or adjust city/days and regenerate." }]);
+          updateCurrentCityMessages(prev => [
+            ...prev,
+            {
+              role: "assistant",
+              content:
+                `Itinerary generation failed.\n` +
+                `Model/backend response: ${result?.error || "No details returned."}\n` +
+                `Debug: tier=${result?.debug?.tier || llmTier}, mode=${result?.debug?.provider_mode || "unknown"}, ` +
+                `candidates=${(result?.debug?.model_candidates || []).join(", ") || "n/a"}, ` +
+                `places=${result?.counts?.places ?? "?"}, days=${result?.counts?.itineraryDays ?? "?"}\n` +
+                `${result?.raw ? `Raw payload: ${result.raw}` : ""}`,
+            },
+          ]);
         }
     } catch (err) {
-        updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: "Failed to load itinerary. Is the backend running?" }]);
+        updateCurrentCityMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Failed to load itinerary.\nError: ${String(err)}`,
+          },
+        ]);
     }
     setLoading(false);
   };
@@ -739,6 +775,7 @@ export default function WalkieTalkie() {
             city={selectedCity}
             areaLabel={walkAreaLabel}
             mockLocation={simulateWalk ? currentGPS : null}
+            llmTier={llmTier}
             onClose={() => setShowMap(false)}
           />
         )}

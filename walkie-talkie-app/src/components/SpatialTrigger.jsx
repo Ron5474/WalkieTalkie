@@ -13,7 +13,7 @@ import { generateIntro } from '../utils/storyTemplating';
  * @param {string|null} [areaLabel] — Neighborhood / day locality from the itinerary when available.
  * @param {{lat:number,lng:number,accuracy?:number}|null} [mockLocation] - Optional simulation location for testing.
  */
-export default function SpatialTrigger({ city = "this city", areaLabel = null, mockLocation = null, onClose }) {
+export default function SpatialTrigger({ city = "this city", areaLabel = null, mockLocation = null, llmTier = "small", onClose }) {
     const primaryArea =
         typeof areaLabel === "string" && areaLabel.trim().length > 0 ? areaLabel.trim() : city;
     const showCityLine =
@@ -68,8 +68,26 @@ export default function SpatialTrigger({ city = "this city", areaLabel = null, m
         loadNodes();
 
         const introText = generateIntro(node.title);
-        const fullText = introText + " " + node.anecdote;
-
+        let personaStory = "";
+        try {
+            const res = await fetch("/api/walk-story", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    city,
+                    place_title: node.title,
+                    anecdote: node.anecdote || "",
+                    llm_tier: llmTier,
+                }),
+            });
+            if (res.ok) {
+                const payload = await res.json();
+                personaStory = (payload?.story || "").trim();
+            }
+        } catch {
+            // Graceful fallback below.
+        }
+        const fullText = personaStory || (introText + " " + (node.anecdote || ""));
         narrator.speak(fullText, () => setNarrating(null));
     };
 

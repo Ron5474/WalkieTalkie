@@ -71,7 +71,9 @@ def get_vision_llm():
 def get_embedding_model() -> OpenAIEmbeddings | OllamaEmbeddings:
     global _embeddings
     if _embeddings is None:
-        if config.OPENROUTER_EMBEDDING_MODEL and not config.force_ollama_fallback():
+        # Allow OpenRouter embeddings even when chat fallback is forced to Ollama.
+        # This keeps vector search current without changing chat/vision routing.
+        if config.OPENROUTER_EMBEDDING_MODEL:
             _embeddings = OpenAIEmbeddings(
                 model=config.OPENROUTER_EMBEDDING_MODEL,
                 api_key=config.openrouter_api_key(),

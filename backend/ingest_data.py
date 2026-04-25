@@ -1,8 +1,12 @@
 """
-Ingest curated text into ChromaDB using Gemini embeddings (Google AI).
+Ingest curated text into ChromaDB using the currently configured embedding backend.
 
-Run from `backend/` with OPENROUTER_API_KEY or FORCE_OLLAMA_FALLBACK=true set:
+Run from `backend/`:
   python ingest_data.py
+
+Embedding source is selected by environment:
+- OPENROUTER_EMBEDDING_MODEL set -> OpenRouter embeddings
+- otherwise -> local Ollama embedding model (EMBEDDING_MODEL)
 
 Requires network for SF URL scraping; Kolkata block is local.
 """
@@ -79,7 +83,7 @@ def main():
 
     emb_model = get_embedding_model()
 
-    print("Embedding via Gemini API...")
+    print("Embedding chunks with configured embedding backend...")
     for i, chunk in enumerate(chunks):
         if i % 5 == 0:
             print(f"  chunk {i}/{len(chunks)}")

@@ -2,10 +2,37 @@ class NarratorService {
     constructor() {
         this.synth = window.speechSynthesis;
         this.activeUtterance = null;
+        this.voicePreferences = [
+            'Natural',
+            'Neural',
+            'Siri',
+            'Samantha',
+            'Karen',
+            'Moira',
+            'Daniel',
+            'Google US English',
+            'Google UK English Female',
+        ];
         // Warm up voices
         if (this.synth) {
             this.synth.getVoices();
         }
+    }
+
+    chooseBestVoice() {
+        if (!this.synth) return null;
+        const voices = this.synth.getVoices() || [];
+        if (!voices.length) return null;
+
+        let selected = null;
+        for (const pref of this.voicePreferences) {
+            selected = voices.find(v => (v.name || '').includes(pref));
+            if (selected) return selected;
+        }
+        selected = voices.find(v => (v.lang || '').toLowerCase().startsWith('en-us'));
+        if (selected) return selected;
+        selected = voices.find(v => (v.lang || '').toLowerCase().startsWith('en-'));
+        return selected || voices[0];
     }
 
     // A web-audio synthesized "Walkie Talkie" ping/squelch sound
@@ -46,20 +73,12 @@ class NarratorService {
         await this.playPing();
 
         this.activeUtterance = new SpeechSynthesisUtterance(text);
-        this.activeUtterance.rate = 0.85; 
-        this.activeUtterance.pitch = 0.95; 
+        // Less robotic defaults: near-natural speaking cadence.
+        this.activeUtterance.rate = 0.96;
+        this.activeUtterance.pitch = 1.02;
+        this.activeUtterance.volume = 1.0;
 
-        // Premium story-telling voice matching from earlier logic
-        const voices = this.synth.getVoices();
-        const preferredVoices = ['Samantha', 'Karen', 'Daniel', 'Moira', 'Google US English', 'Google UK English Female'];
-        let selectedVoice = null;
-        for (const name of preferredVoices) {
-            selectedVoice = voices.find(v => v.name.includes(name));
-            if (selectedVoice) break;
-        }
-        if (!selectedVoice) {
-            selectedVoice = voices.find(v => v.lang.startsWith('en-'));
-        }
+        const selectedVoice = this.chooseBestVoice();
         if (selectedVoice) {
             this.activeUtterance.voice = selectedVoice;
         }
