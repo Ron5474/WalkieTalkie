@@ -5,8 +5,24 @@ import { getNodes, markNodeVisited, resetVisited } from '../db/db';
 import { narrator } from '../services/NarratorService';
 import { generateIntro } from '../utils/storyTemplating';
 
-export default function SpatialTrigger({ onClose }) {
-    const { location, error } = useGeolocation();
+/**
+ * Locality-first walking tour: explore by neighborhood stop, not turn-by-turn directions.
+ * When you're physically near a stop (~20m), the story plays automatically.
+ *
+ * @param {string} city — Trip city (always from the toolbar).
+ * @param {string|null} [areaLabel] — Neighborhood / day locality from the itinerary when available.
+ * @param {{lat:number,lng:number,accuracy?:number}|null} [mockLocation] - Optional simulation location for testing.
+ */
+export default function SpatialTrigger({ city = "this city", areaLabel = null, mockLocation = null, onClose }) {
+    const primaryArea =
+        typeof areaLabel === "string" && areaLabel.trim().length > 0 ? areaLabel.trim() : city;
+    const showCityLine =
+        typeof areaLabel === "string" &&
+        areaLabel.trim().length > 0 &&
+        city &&
+        areaLabel.trim().toLowerCase() !== city.trim().toLowerCase();
+    const { location: liveLocation, error } = useGeolocation();
+    const location = mockLocation || liveLocation;
     const [nodes, setNodes] = useState([]);
     const [targetNode, setTargetNode] = useState(null);
     const [distance, setDistance] = useState(null);
@@ -31,12 +47,11 @@ export default function SpatialTrigger({ onClose }) {
             const dist = calculateDistance(
                 location.lat,
                 location.lng,
-                targetNode.lat, // target is node.lat
+                targetNode.lat,
                 targetNode.lng
             );
             setDistance(Math.round(dist));
 
-            // Trigger radius: 20 meters
             if (dist <= 20 && !targetNode.locked && !narrating) {
                 triggerNarration(targetNode);
             }
@@ -46,12 +61,11 @@ export default function SpatialTrigger({ onClose }) {
     const triggerNarration = async (node) => {
         setNarrating(node.title);
         narrator.currentTopic = node.title;
-        
-        // Immediately set local targetNode to locked/visited to break the infinite trigger loop
+
         setTargetNode(prev => ({ ...prev, visited: true, locked: true }));
 
         await markNodeVisited(node.id);
-        loadNodes(); // refresh visited status
+        loadNodes();
 
         const introText = generateIntro(node.title);
         const fullText = introText + " " + node.anecdote;
@@ -68,56 +82,73 @@ export default function SpatialTrigger({ onClose }) {
         <div style={styles.overlay}>
             <div style={styles.container}>
                 <button style={styles.closeBtn} onClick={() => { stopNarration(); onClose(); }}>✕</button>
-                <h2 style={styles.title}>Local Walk: Chinatown</h2>
+                <h2 style={styles.title}>Walk · {primaryArea}</h2>
+                {showCityLine ? (
+                    <p style={styles.cityLine}>{city}</p>
+                ) : null}
+                <p style={styles.blurb}>
+                    Choose a stop in <strong>this area</strong> — we’re not giving turn-by-turn directions.
+                    Wander the block; when you’re within about 20m, the story unlocks automatically.
+                </p>
 
                 {error && <p style={styles.error}>Location error: {error}</p>}
-                {!location && !error && <p style={styles.info}>Acquiring GPS signal...</p>}
-                {location && <p style={styles.info}>Accuracy: {Math.round(location.accuracy)}m</p>}
+                {!location && !error && <p style={styles.info}>Finding your position…</p>}
+                {location && <p style={styles.info}>Location accuracy ~{Math.round(location.accuracy)}m</p>}
 
                 {narrating ? (
                     <div style={styles.narratingBox}>
-                        <h3>🔊 Narrating: {narrating}</h3>
+                        <h3>🔊 Story: {narrating}</h3>
                         <div className="typing" style={{ justifyContent: 'center', margin: '20px 0' }}>
                             <div className="dot" /><div className="dot" /><div className="dot" />
                         </div>
-                        <button style={styles.stopBtn} onClick={stopNarration}>Stop Narration</button>
+                        <button style={styles.stopBtn} onClick={stopNarration}>Stop</button>
                     </div>
                 ) : (
                     targetNode ? (
                         <div style={styles.guidingBox}>
-                            <h3>Guiding to: {targetNode.title}</h3>
-                            <p style={{ fontSize: '48px', margin: '10px 0', color: '#c8a96e' }}>
-                                {distance !== null ? `${distance}m` : 'Calculating...'}
+                            <h3>Walking stop: {targetNode.title}</h3>
+                            <p style={{ fontSize: '15px', color: '#c4b69a', marginBottom: '12px', lineHeight: 1.5 }}>
+                                Stroll this part of town — no driving directions, just local context when you arrive.
+                            </p>
+                            <p style={{ fontSize: '36px', margin: '10px 0', color: '#c8a96e' }}>
+                                {distance !== null ? `~${distance} m` : '…'}
+                            </p>
+                            <p style={{ fontSize: '13px', color: '#8a7d66', marginBottom: '16px' }}>
+                                {distance !== null && distance > 20
+                                    ? 'Move closer to this corner or block to unlock the narration (~20m).'
+                                    : distance !== null && distance <= 20
+                                        ? 'You’re in range — story should play, or tap below.'
+                                        : null}
                             </p>
                             {distance !== null && distance <= 20 && targetNode.visited && (
-                                <button 
-                                    style={{ ...styles.btn, marginBottom: '12px', background: 'rgba(200, 169, 110, 0.1)' }} 
+                                <button
+                                    style={{ ...styles.btn, marginBottom: '12px', background: 'rgba(200, 169, 110, 0.1)' }}
                                     onClick={() => triggerNarration(targetNode)}
                                 >
-                                    Repeat Story 🎧
+                                    Play story again 🎧
                                 </button>
                             )}
-                            <button style={styles.btn} onClick={() => setTargetNode(null)}>Cancel Guidance</button>
+                            <button style={styles.btn} onClick={() => setTargetNode(null)}>Pick another stop</button>
                         </div>
                     ) : (
                         <div style={styles.list}>
-                            <h3 style={{ marginBottom: '10px', color: '#c4b69a', fontSize: '15px' }}>Select a Point of Interest:</h3>
+                            <h3 style={{ marginBottom: '10px', color: '#c4b69a', fontSize: '15px' }}>Stops in your plan (same-day area)</h3>
                             {nodes.map(n => (
                                 <div key={n.id} style={styles.nodeCard}>
                                     <div>
                                         <strong style={{ fontSize: '14px' }}>{n.title}</strong>
-                                        {n.visited && <span style={styles.badge}>Visited</span>}
+                                        {n.visited && <span style={styles.badge}>Heard</span>}
                                     </div>
                                     <button
                                         style={styles.navBtn}
                                         onClick={() => setTargetNode(n)}
                                     >
-                                        Navigate
+                                        Walk here
                                     </button>
                                 </div>
                             ))}
                             <div style={styles.actions}>
-                                <button style={{ ...styles.btn, marginTop: '20px' }} onClick={handleReset}>Reset Progress</button>
+                                <button style={{ ...styles.btn, marginTop: '20px' }} onClick={handleReset}>Reset stops</button>
                             </div>
                         </div>
                     )
@@ -146,7 +177,21 @@ const styles = {
     title: {
         fontFamily: "'Playfair Display', serif",
         color: '#c8a96e',
-        marginBottom: '20px',
+        marginBottom: '6px',
+        marginTop: 0
+    },
+    cityLine: {
+        fontSize: '13px',
+        color: '#8a7d66',
+        marginBottom: '10px',
+        marginTop: 0,
+        letterSpacing: '0.02em'
+    },
+    blurb: {
+        fontSize: '13px',
+        color: '#8a7d66',
+        lineHeight: 1.55,
+        marginBottom: '18px',
         marginTop: 0
     },
     closeBtn: {
@@ -185,5 +230,6 @@ const styles = {
     },
     guidingBox: {
         textAlign: 'center', padding: '20px 0'
-    }
+    },
+    actions: {}
 };

@@ -2,8 +2,11 @@ fastapi
 uvicorn
 langchain
 langchain-community
+langchain-openai
+langchain-ollama
+langchain-text-splitters
+python-dotenv
 chromadb
-sqlalchemy
-ollama
 requests
 beautifulsoup4
+pyyaml

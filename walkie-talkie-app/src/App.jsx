@@ -29,35 +29,315 @@ DO NOT plan an itinerary unless explicitly asked. Focus entirely on describing w
 End your response with a "Local Secret" tip related to the kind of place or object shown in the image. Keep responses conversational, vivid, and under 250 words.`;
 
 const suggestedPrompts = [
-  { icon: "🍜", text: "5 cheap lunch spots where locals actually eat in a historic district" },
-  { icon: "🎨", text: "Best neighborhoods for community-driven street art" },
-  { icon: "🚌", text: "Cheapest public transit from airport to city center" },
-  { icon: "📸", text: "Free Instagram spot that's culturally significant, not touristy" },
-  { icon: "🏘️", text: "How has a neighborhood changed in 50 years?" },
-  { icon: "💰", text: "1-day plan for under $30 with history, food & a sunset" },
+  { icon: "🚶", text: "I'm walking near my pinned GPS — what should I notice here, and what's one affordable next stop?" },
+  { icon: "🍜", text: "5 cheap lunch spots where locals eat in Chinatown (San Francisco)" },
+  { icon: "🎨", text: "Best neighborhoods for community street art in San Francisco" },
+  { icon: "📸", text: "One free, culturally significant photo spot that's not a tourist trap" },
+  { icon: "🧭", text: "Tell me a Kolkata story that isn't in standard tourist brochures" },
+  { icon: "💰", text: "1-day plan under $30 with history, food, and a sunset (use my profile budget)" },
 ];
 
 import SpatialTrigger from './components/SpatialTrigger';
+import { useGeolocation } from './hooks/useGeolocation';
 import { narrator } from './services/NarratorService';
 
-const CITIES = ["San Francisco", "Boston", "New York", "San Diego", "Kyoto", "Tokyo", "London", "Kolkata", "Mumbai"];
+/** Must match backend `config.HERO_CITIES` (itinerary + holiday briefing). */
+const CITIES = [
+  "Boston",
+  "Chicago",
+  "Kolkata",
+  "Los Angeles",
+  "Miami",
+  "New York",
+  "Philadelphia",
+  "San Francisco",
+  "Seattle",
+  "Washington DC",
+];
+
+/** Calendar label for itinerary day 1..N from trip start (YYYY-MM-DD). */
+function formatTripDayHeading(isoDateStr, dayNum) {
+  if (!isoDateStr || !dayNum) return null;
+  const parts = isoDateStr.split("-");
+  if (parts.length !== 3) return null;
+  const y = parseInt(parts[0], 10);
+  const mo = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const dt = new Date(y, mo, d + (dayNum - 1));
+  if (Number.isNaN(dt.getTime())) return null;
+  const weekday = dt.toLocaleDateString(undefined, { weekday: "long" });
+  const rest = dt.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  return `${weekday} — ${rest}`;
+}
 
 export default function WalkieTalkie() {
   const [showMap, setShowMap] = useState(false);
+  const [simulateWalk, setSimulateWalk] = useState(true);
+  const [tripMode, setTripMode] = useState("planning");
   const [selectedCity, setSelectedCity] = useState("San Francisco");
+  const [llmTier, setLlmTier] = useState("large");
   const [travelDates, setTravelDates] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [numDays, setNumDays] = useState(1);
+  const [budget, setBudget] = useState("Moderate");
+  const [activeTab, setActiveTab] = useState("itinerary");
+  const [itineraryMap, setItineraryMap] = useState(null);
+  
+  // Dynamic GPS logic
+  const { location } = useGeolocation();
+  const [mockGPS, setMockGPS] = useState({ lat: 37.7955, lng: -122.3937 });
+  
+  useEffect(() => {
+    if (!simulateWalk) return undefined;
+    const demoSpots = [
+      { lat: 37.7907, lng: -122.4058 }, // Dragon's Gate
+      { lat: 37.7937, lng: -122.4048 }, // Portsmouth Square
+      { lat: 37.7940, lng: -122.4056 }, // Golden Gate Fortune Cookie
+    ];
+    let idx = 0;
+    const interval = setInterval(() => {
+      idx = (idx + 1) % demoSpots.length;
+      setMockGPS(demoSpots[idx]);
+    }, 20 * 1000); // quick walk simulation for testing
+    return () => clearInterval(interval);
+  }, [simulateWalk]);
+  const currentGPS = simulateWalk ? mockGPS : (location || mockGPS);
+
+  const [chatByCity, setChatByCity] = useState({});
+  const [sessionToken, setSessionToken] = useState(null);
+  const [sessionUserId, setSessionUserId] = useState("");
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authUserId, setAuthUserId] = useState("");
+  const [userBudget, setUserBudget] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [actionPlan, setActionPlan] = useState([]);
+  /** Weather + packing from /api/holiday-briefing when entering Holiday Mode */
+  const [holidayBriefing, setHolidayBriefing] = useState(null);
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const AUTH_STORAGE_KEY = "walkie_talkie_auth_v1";
+  const chatStorageKey = `walkie_talkie_chat_by_city_v1_${sessionUserId || "guest"}`;
+
+  const messages = chatByCity[selectedCity] || [];
+
+  const updateCurrentCityMessages = (updater) => {
+    setChatByCity((prev) => {
+      const current = prev[selectedCity] || [];
+      const nextMessages = typeof updater === "function" ? updater(current) : updater;
+      return { ...prev, [selectedCity]: nextMessages };
+    });
+  };
+
+  const getPreviewText = (msg) => {
+    if (!msg) return "";
+    if (msg.role === "assistant") return (msg.content || "").replace(/\s+/g, " ").trim();
+    return (msg.text || "").replace(/\s+/g, " ").trim();
+  };
+
+  const chatHistoryItems = CITIES.filter((city) => city === selectedCity || (chatByCity[city] && chatByCity[city].length > 0))
+    .map((city) => {
+      const thread = chatByCity[city] || [];
+      const lastVisible = [...thread].reverse().find((m) => !m.hidden);
+      return {
+        city,
+        count: thread.filter((m) => !m.hidden).length,
+        preview: getPreviewText(lastVisible).slice(0, 80),
+      };
+    });
+
+  useEffect(() => {
+    try {
+      const authRaw = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (authRaw) {
+        const auth = JSON.parse(authRaw);
+        if (auth?.session_token && auth?.expires_at * 1000 > Date.now()) {
+          setSessionToken(auth.session_token);
+          setSessionUserId(auth.user_id || "");
+          setAuthUserId(auth.user_id || "");
+          if (auth.profile?.budget != null) setUserBudget(String(auth.profile.budget));
+        }
+      }
+    } catch {
+      // Ignore corrupted local storage payloads.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(chatStorageKey, JSON.stringify(chatByCity));
+    } catch {
+      // Ignore quota/serialization errors.
+    }
+  }, [chatByCity, chatStorageKey]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(chatStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") setChatByCity(parsed);
+        else setChatByCity({});
+      } else {
+        setChatByCity({});
+      }
+    } catch {
+      setChatByCity({});
+    }
+  }, [chatStorageKey]);
+
+  const signIn = async () => {
+    const uid = (authUserId || "").trim();
+    if (!uid) return;
+    const budgetNum = parseInt(userBudget, 10);
+    const res = await fetch("/api/auth/signin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: uid,
+        budget: Number.isFinite(budgetNum) ? budgetNum : undefined,
+      }),
+    });
+    const j = await res.json();
+    if (j?.ok && j.session_token) {
+      setSessionToken(j.session_token);
+      setSessionUserId(j.user_id || uid);
+      if (j.profile?.budget != null) setUserBudget(String(j.profile.budget));
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(j));
+      setIsAuthModalOpen(false);
+      return true;
+    }
+    return false;
+  };
+
+  const saveBudgetPreference = async () => {
+    if (!sessionToken) return;
+    const n = parseInt(userBudget, 10);
+    if (!Number.isFinite(n)) return;
+    await fetch("/api/user/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_token: sessionToken, budget: n }),
+    });
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  /** Neighborhood line for Start Walk — from day 1 of the generated plan, else falls back to city in SpatialTrigger. */
+  const walkAreaLabel =
+    Array.isArray(itineraryMap) && itineraryMap.length > 0 && itineraryMap[0].locality
+      ? itineraryMap[0].locality
+      : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    import("./db/db.js").then((m) => {
+      const chain = m.ensureDefaultWalkNodesForCity(selectedCity).then(() => {
+        if (selectedCity === "San Francisco") {
+          return m.ensureSanFranciscoDemoStopsPresent();
+        }
+      });
+      return chain.then(() => {
+        if (cancelled) return;
+        return Promise.all([
+          m.getUnvisitedNodes().then((nodes) => {
+            if (!cancelled) setActionPlan(nodes);
+          }),
+          m.getSystemMapping().then((map) => {
+            if (!cancelled) setItineraryMap(map);
+          }),
+        ]);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once on load from IndexedDB
+  }, []);
+
+  const handleGenerateItinerary = async () => {
+    setLoading(true);
+    const { fetchDynamicNodes, getUnvisitedNodes, getSystemMapping } = await import('./db/db.js');
+    try {
+        const ok = await fetchDynamicNodes(selectedCity, travelDates, numDays, budget, llmTier);
+        const unvisited = await getUnvisitedNodes();
+        const mapping = await getSystemMapping();
+        setActionPlan(unvisited);
+        setItineraryMap(mapping);
+        if (ok && Array.isArray(mapping) && mapping.length > 0) {
+          updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: `I've generated a ${numDays}-day itinerary for ${selectedCity}. Switch to Holiday Mode → Day-to-Day to see each day.` }]);
+        } else {
+          updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: "I couldn't generate a valid day plan for that request. Please try again, or adjust city/days and regenerate." }]);
+        }
+    } catch (err) {
+        updateCurrentCityMessages(prev => [...prev, { role: "assistant", content: "Failed to load itinerary. Is the backend running?" }]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (tripMode === 'active') {
+      import('./db/db.js').then(module => {
+        module.getUnvisitedNodes().then(nodes => setActionPlan(nodes));
+        module.getSystemMapping().then(mapping => setItineraryMap(mapping));
+      });
+    }
+  }, [tripMode]);
+
+  useEffect(() => {
+    if (tripMode !== "active") {
+      setHolidayBriefing(null);
+      return;
+    }
+    let cancelled = false;
+    setHolidayBriefing({ loading: true });
+    fetch("/api/holiday-briefing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        city: selectedCity,
+        start_date: travelDates || null,
+        days: numDays,
+      }),
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setHolidayBriefing({ loading: false, ...j });
+      })
+      .catch((e) => {
+        if (!cancelled) setHolidayBriefing({ loading: false, error: String(e), packing_advice: "" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripMode, selectedCity, travelDates, numDays]);
+
+  const handleMarkCovered = async (nodeId, nodeTitle) => {
+    const { markNodeVisited, getUnvisitedNodes } = await import('./db/db.js');
+    await markNodeVisited(nodeId);
+    const unvisited = await getUnvisitedNodes();
+    setActionPlan(unvisited);
+    if (sessionToken) {
+      fetch("/api/user/visited", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_token: sessionToken,
+          city: selectedCity,
+          place_name: nodeTitle,
+        }),
+      }).catch(() => {});
+    }
+    
+    // Proactive trigger to the Assistant (silent reroute logic)
+    const systemPromptMsg = `[SYSTEM NUDGE] The user just marked "${nodeTitle}" as completed. Tell them "Great job!" and proactively suggest what they should do next on their itinerary right now.`;
+    sendMessage(systemPromptMsg, true);
+  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -72,15 +352,23 @@ export default function WalkieTalkie() {
     reader.readAsDataURL(file);
   };
 
-  const sendMessage = async (text) => {
-    const userText = text || input.trim();
+  const sendMessage = async (text, isHidden = false) => {
+    if (!sessionToken) {
+      updateCurrentCityMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Please sign in to keep your conversation history, visited places, and budget preferences synced." },
+      ]);
+      setIsAuthModalOpen(true);
+      // Continue as guest so first-time users still get a model response.
+    }
+    const userText = (typeof text === 'string' ? text : null) || input.trim();
     if (!userText && !image) return;
 
     // Handle resume logic if user says yes to continuing the story
     if (narrator.synth && narrator.synth.paused && userText.match(/^(yes|yeah|sure|yep|please|go ahead|finish)/i)) {
         narrator.resume();
         const newMessages = [...messages, { role: "user", text: userText }, { role: "assistant", content: "Resuming the story..." }];
-        setMessages(newMessages);
+        updateCurrentCityMessages(newMessages);
         setInput("");
         return;
     }
@@ -101,12 +389,12 @@ export default function WalkieTalkie() {
       userContent.push({ type: "text", text: userText });
     }
 
-    const newMessages = [...messages, { role: "user", content: userContent, preview: imagePreview, text: userText }];
-    setMessages(newMessages);
+    const newMessages = [...messages, { role: "user", content: userContent, preview: imagePreview, text: userText, hidden: isHidden }];
+    updateCurrentCityMessages(newMessages);
     setInput("");
     setImage(null);
     setImagePreview(null);
-    setLoading(true);
+    if (!isHidden) setLoading(true);
 
     const apiMessages = newMessages.map((m) => {
       // Extract text content (Ollama expects content to be a string)
@@ -141,20 +429,22 @@ export default function WalkieTalkie() {
     }
 
     try {
-      // Add an initial empty assistant message to hold the streaming content
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
       const hasImage = apiMessages.some(m => m.images);
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: hasImage ? "llama3.2-vision" : "phi4",
+          model: hasImage ? "vision" : llmTier,
+          llm_tier: llmTier,
           messages: [
-            { role: "system", content: (hasImage ? VISION_SYSTEM_PROMPT : SYSTEM_PROMPT) + `\n\n[CONTEXT: User is currently planning a trip to ${selectedCity} during the dates: ${travelDates || 'TBD'}. Tailor responses and live events data to this location and timeframe.]` },
+            { role: "system", content: (hasImage ? VISION_SYSTEM_PROMPT : SYSTEM_PROMPT) + `\n\n[CONTEXT: User focus city is ${selectedCity}; travel dates: ${travelDates || "TBD"}.]` },
             ...apiMessages
           ],
-          stream: true, // Enable streaming
+          stream: true,
+          latitude: currentGPS.lat,
+          longitude: currentGPS.lng,
+          city: selectedCity,
+          session_token: sessionToken,
         }),
       });
 
@@ -166,6 +456,7 @@ export default function WalkieTalkie() {
       setLoading(false); // Turn off loading dots as soon as stream starts
 
       let fullReply = "";
+      let appendedAssistant = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -179,10 +470,18 @@ export default function WalkieTalkie() {
               const parsed = JSON.parse(line);
               if (parsed.message?.content) {
                 fullReply += parsed.message.content;
-                // Update the last message (the assistant one we just added)
-                setMessages((prev) => {
+                updateCurrentCityMessages((prev) => {
+                  if (!appendedAssistant) {
+                    appendedAssistant = true;
+                    return [...prev, { role: "assistant", content: fullReply }];
+                  }
                   const newMsgs = [...prev];
-                  newMsgs[newMsgs.length - 1].content = fullReply;
+                  const lastIdx = newMsgs.length - 1;
+                  if (lastIdx >= 0 && newMsgs[lastIdx].role === "assistant") {
+                    newMsgs[lastIdx] = { ...newMsgs[lastIdx], content: fullReply };
+                  } else {
+                    newMsgs.push({ role: "assistant", content: fullReply });
+                  }
                   return newMsgs;
                 });
               }
@@ -193,15 +492,10 @@ export default function WalkieTalkie() {
         }
       }
     } catch (err) {
-      setMessages((prev) => {
-        // If we created a blank stream message, overwrite it with the error. Otherwise push a new error block.
-        if (prev[prev.length - 1].role === "assistant" && prev[prev.length - 1].content === "") {
-          const newMsgs = [...prev];
-          newMsgs[newMsgs.length - 1].content = "Something went wrong connecting to the local AI. Is Ollama running?";
-          return newMsgs;
-        }
-        return [...prev, { role: "assistant", content: "Something went wrong connecting to the local AI. Is Ollama running?" }];
-      });
+      updateCurrentCityMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Could not reach the API backend. Check uvicorn on :8000 and OpenRouter settings in backend/.env." },
+      ]);
       setLoading(false);
     }
   };
@@ -214,12 +508,63 @@ export default function WalkieTalkie() {
   };
 
   const formatText = (text) => {
-    return text
+    const renderPipeTables = (raw) => {
+      const lines = raw.split("\n");
+      const out = [];
+      let i = 0;
+
+      const isPipeRow = (line) => {
+        const t = line.trim();
+        return (t.match(/\|/g) || []).length >= 2;
+      };
+      const isSeparatorRow = (line) => {
+        const t = line.trim();
+        return isPipeRow(t) && /^[\|\s:\-]+$/.test(t);
+      };
+      const splitCells = (line) => {
+        const t = line.trim();
+        const normalized = t.startsWith("|") ? t.slice(1) : t;
+        const normalized2 = normalized.endsWith("|") ? normalized.slice(0, -1) : normalized;
+        return normalized2.split("|").map((c) => c.trim());
+      };
+
+      while (i < lines.length) {
+        let j = i + 1;
+        while (j < lines.length && lines[j].trim() === "") j += 1;
+        if (j < lines.length && isPipeRow(lines[i]) && isSeparatorRow(lines[j])) {
+          const headerCells = splitCells(lines[i]);
+          i = j + 1;
+          const bodyRows = [];
+          while (i < lines.length && isPipeRow(lines[i])) {
+            bodyRows.push(splitCells(lines[i]));
+            i += 1;
+          }
+
+          const headHtml = `<tr>${headerCells.map((c) => `<th>${c}</th>`).join("")}</tr>`;
+          const bodyHtml = bodyRows
+            .map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`)
+            .join("");
+
+          out.push(
+            `<div class="md-table-wrap"><table class="md-table"><thead>${headHtml}</thead><tbody>${bodyHtml}</tbody></table></div>`
+          );
+          continue;
+        }
+        out.push(lines[i]);
+        i += 1;
+      }
+      return out.join("\n");
+    };
+
+    const withTables = renderPipeTables(text);
+    return withTables
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
       .replace(/🗝️[^\n]*/g, (m) => `<span class="local-secret">${m}</span>`)
       .replace(/Local Secret[^\n]*/g, (m) => `<span class="local-secret">🗝️ ${m}</span>`)
-      .replace(/\n/g, "<br>");
+      .replace(/\n/g, "<br>")
+      .replace(/<br>\s*<div class="md-table-wrap">/g, '<div class="md-table-wrap">')
+      .replace(/<\/div>\s*<br>/g, "</div>");
   };
 
   const isEmpty = messages.length === 0;
@@ -248,6 +593,26 @@ export default function WalkieTalkie() {
         .brand { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #c8a96e; letter-spacing: -0.5px; }
         .tagline { font-size: 11px; color: #6b6452; text-transform: uppercase; letter-spacing: 2px; margin-top: 1px; }
         
+        .main-layout { display: flex; flex: 1; min-height: 0; }
+        .history-pane {
+          width: 250px; border-right: 1px solid #2a2820; background: #12110d;
+          padding: 14px 10px; overflow-y: auto;
+        }
+        .history-title {
+          color: #8a7d66; font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px;
+          margin: 4px 8px 10px; font-weight: 700;
+        }
+        .history-item {
+          width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
+          border-radius: 10px; color: #c4b69a; padding: 10px; cursor: pointer; margin-bottom: 8px;
+        }
+        .history-item:hover { border-color: #c8a96e33; background: #1a1810; }
+        .history-item.active { border-color: #c8a96e66; background: #1a1810; }
+        .history-city { font-size: 13px; color: #f0ead6; font-weight: 600; margin-bottom: 3px; }
+        .history-meta { font-size: 11px; color: #8a7d66; margin-bottom: 2px; }
+        .history-preview { font-size: 11px; color: #9f9278; line-height: 1.35; }
+
+        .chat-area-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
         .chat-area { flex: 1; overflow-y: auto; padding: 24px 16px; max-width: 780px; margin: 0 auto; width: 100%; }
         
         .welcome { text-align: center; padding: 48px 20px 32px; }
@@ -275,6 +640,35 @@ export default function WalkieTalkie() {
         .bubble.ai { background: #1a1810; border: 1px solid #2a2820; color: #ddd5c0; border-radius: 4px 14px 14px 14px; }
         .bubble.user { background: linear-gradient(135deg, #c8a96e22, #8b691422); border: 1px solid #c8a96e33; color: #f0ead6; border-radius: 14px 4px 14px 14px; }
         .local-secret { display: block; margin-top: 12px; padding: 10px 12px; background: #c8a96e11; border-left: 2px solid #c8a96e; border-radius: 0 8px 8px 0; color: #c8a96e; font-style: italic; font-size: 13.5px; }
+        .md-table-wrap {
+          margin: 14px 0;
+          overflow-x: auto;
+          border: 1px solid #c8a96e33;
+          border-radius: 10px;
+          background: #16140f;
+        }
+        .md-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13.5px;
+          line-height: 1.45;
+        }
+        .md-table th, .md-table td {
+          padding: 8px 10px;
+          border-bottom: 1px solid #2f2a20;
+          border-right: 1px solid #2f2a20;
+          vertical-align: top;
+          text-align: left;
+          white-space: normal;
+        }
+        .md-table th:last-child, .md-table td:last-child { border-right: none; }
+        .md-table tbody tr:last-child td { border-bottom: none; }
+        .md-table th {
+          color: #d8c59a;
+          font-weight: 700;
+          background: #201c14;
+        }
+        .md-table td { color: #ddd5c0; }
         .img-preview { max-width: 200px; border-radius: 8px; margin-bottom: 8px; display: block; }
         
         .typing { display: flex; gap: 4px; align-items: center; padding: 14px 16px; }
@@ -315,13 +709,73 @@ export default function WalkieTalkie() {
       `}</style>
 
       <div className="app" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-        {showMap && <SpatialTrigger onClose={() => setShowMap(false)} />}
+        {isAuthModalOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "#1a1810", border: "1px solid #c8a96e55", borderRadius: "12px", padding: "18px", width: "min(420px, 92vw)" }}>
+              <h3 style={{ color: "#c8a96e", marginBottom: "8px", fontFamily: "'Playfair Display', serif" }}>Sign in to continue</h3>
+              <p style={{ color: "#c4b69a", fontSize: "13px", marginBottom: "12px" }}>We keep your city-wise chat history, visited places, and budget for 24 hours.</p>
+              <input
+                placeholder="User ID (e.g., spartan)"
+                value={authUserId}
+                onChange={(e) => setAuthUserId(e.target.value)}
+                style={{ width: "100%", marginBottom: "10px", background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "8px 10px", borderRadius: "8px" }}
+              />
+              <input
+                type="number"
+                placeholder="Budget/day (optional)"
+                value={userBudget}
+                onChange={(e) => setUserBudget(e.target.value)}
+                style={{ width: "100%", marginBottom: "12px", background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "8px 10px", borderRadius: "8px" }}
+              />
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button onClick={() => setIsAuthModalOpen(false)} style={{ background: "transparent", color: "#c4b69a", border: "1px solid #3a3428", padding: "7px 12px", borderRadius: "8px" }}>Later</button>
+                <button onClick={signIn} style={{ background: "#8b6914", color: "#0f0e0b", border: "none", padding: "7px 12px", borderRadius: "8px", fontWeight: "bold" }}>Sign in</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showMap && (
+          <SpatialTrigger
+            city={selectedCity}
+            areaLabel={walkAreaLabel}
+            mockLocation={simulateWalk ? currentGPS : null}
+            onClose={() => setShowMap(false)}
+          />
+        )}
         <div className="header">
           <div className="logo-mark">🗺️</div>
           <div style={{ flex: 1 }}>
             <div className="brand">WalkieTalkie</div>
             <div className="tagline">Local Intel · Budget Travel · Hidden Cities</div>
           </div>
+          
+          <div style={{ display: 'flex', background: '#2a2820', borderRadius: '20px', padding: '4px', marginRight: '8px' }}>
+            <button
+                type="button"
+                onClick={() => setTripMode("planning")}
+                style={{ background: tripMode === "planning" ? '#c8a96e' : 'transparent', color: tripMode === "planning" ? '#0f0e0b' : '#8a7d66', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
+                Plan Itinerary
+            </button>
+            <button
+                type="button"
+                onClick={() => setTripMode("active")}
+                style={{ background: tripMode === "active" ? '#c8a96e' : 'transparent', color: tripMode === "active" ? '#0f0e0b' : '#8a7d66', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
+                Holiday Mode
+            </button>
+            {tripMode === "active" && (
+              <button
+                  type="button"
+                  title="Sends a coach-style check-in to the guide (energy, snack break vs pace). Not a clock — switch to Plan Itinerary to read the assistant reply in chat."
+                  onClick={() => {
+                    const systemPromptMsg = `[SYSTEM AUTOMATION] Time jump simulation: The afternoon is passing quickly and the user still has ${actionPlan.length} places left. Proactively ask how they are doing and suggest either taking a break for a snack or picking up the pace!`;
+                    sendMessage(systemPromptMsg, true);
+                  }}
+                  style={{ background: 'transparent', color: '#8b6914', border: '1px solid #8b691444', padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', marginLeft: '8px' }}>
+                  Day check-in ⏱️
+              </button>
+            )}
+          </div>
+
           <button
             style={{ background: '#c8a96e', color: '#0f0e0b', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}
             onClick={() => setShowMap(true)}
@@ -330,8 +784,9 @@ export default function WalkieTalkie() {
           </button>
         </div>
 
+        {tripMode === "planning" && (
         <div style={{ padding: "12px 24px", background: "#1a1810", borderBottom: "1px solid #2a2820", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold" }}>Location Focus:</span>
+           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold" }}>City:</span>
            <select 
               value={selectedCity}
               onChange={e => setSelectedCity(e.target.value)}
@@ -339,17 +794,190 @@ export default function WalkieTalkie() {
            >
               {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
            </select>
+
+           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold", marginLeft: "8px" }}>Model tier:</span>
+           <select
+              value={llmTier}
+              onChange={(e) => setLlmTier(e.target.value)}
+              title="Small vs large OpenRouter model (rubric comparison)"
+              style={{ background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "6px 12px", borderRadius: "8px", outline: "none", fontSize: "14px", fontFamily: "inherit", cursor: "pointer" }}
+           >
+              <option value="large">Large (nvidia/nemotron-3-nano-30b-a3b:free)</option>
+              <option value="small">Small (nvidia/nemotron-nano-9b-v2:free)</option>
+           </select>
            
+           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold", marginLeft: "8px" }}>Days:</span>
+           <input
+              type="number"
+              min={1}
+              max={14}
+              value={numDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n)) setNumDays(Math.min(14, Math.max(1, n)));
+              }}
+              title="Number of days for this trip (used when you generate the itinerary)"
+              style={{ width: "56px", background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "6px 8px", borderRadius: "8px", outline: "none", fontSize: "14px", fontFamily: "inherit" }}
+           />
+           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold", marginLeft: "8px" }}>My budget/day:</span>
+           <input
+              type="number"
+              min={0}
+              value={userBudget}
+              onChange={(e) => setUserBudget(e.target.value)}
+              onBlur={saveBudgetPreference}
+              placeholder="USD"
+              title="Saved to your profile when signed in"
+              style={{ width: "84px", background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "6px 8px", borderRadius: "8px", outline: "none", fontSize: "14px", fontFamily: "inherit" }}
+           />
+
+           <span style={{ fontSize: "12px", color: "#8a7d66", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold", marginLeft: "8px" }}>Start date:</span>
            <input 
               type="date"
               value={travelDates}
               onChange={e => setTravelDates(e.target.value)}
               style={{ background: "#2a2820", color: "#f0ead6", border: "1px solid #c8a96e44", padding: "5px 12px", borderRadius: "8px", outline: "none", fontSize: "14px", fontFamily: "inherit", colorScheme: "dark", cursor: "pointer" }}
            />
+           
+           <button 
+              onClick={handleGenerateItinerary}
+              disabled={loading}
+              style={{ background: '#8b6914', color: '#0f0e0b', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+              Generate itinerary
+           </button>
+           <button
+              onClick={() => setSimulateWalk((v) => !v)}
+              style={{
+                background: simulateWalk ? '#c8a96e' : '#2a2820',
+                color: simulateWalk ? '#0f0e0b' : '#f0ead6',
+                border: '1px solid #c8a96e44',
+                padding: '6px 14px',
+                borderRadius: '16px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}>
+              {simulateWalk ? 'Walk sim: ON' : 'Walk sim: OFF'}
+           </button>
         </div>
+        )}
 
+        <div className="main-layout">
+        {tripMode === "planning" && (
+          <aside className="history-pane">
+            <div className="history-title">Chat History by Location</div>
+            {chatHistoryItems.map((item) => (
+              <button
+                key={item.city}
+                className={`history-item ${item.city === selectedCity ? "active" : ""}`}
+                onClick={() => setSelectedCity(item.city)}
+              >
+                <div className="history-city">{item.city}</div>
+                <div className="history-meta">{item.count} message{item.count === 1 ? "" : "s"}</div>
+                <div className="history-preview">{item.preview || "No messages yet."}</div>
+              </button>
+            ))}
+          </aside>
+        )}
+
+        <div className="chat-area-wrap">
         <div className="chat-area" style={{ flex: 1 }}>
-          {isEmpty ? (
+          {tripMode === 'active' ? (
+             <div className="action-plan">
+               <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#c8a96e", marginBottom: "6px" }}>Holiday Action Plan</h2>
+               <p style={{ color: "#8a7d66", fontSize: "14px", marginBottom: "16px", lineHeight: 1.5 }}>
+                 {Array.isArray(itineraryMap) && itineraryMap.length > 0 ? (
+                   <>Day-to-day shows <strong style={{ color: "#c8a96e" }}>{itineraryMap.length} day{itineraryMap.length === 1 ? "" : "s"}</strong> from your last generated plan.</>
+                 ) : (
+                   <>No multi-day plan loaded yet — set <strong style={{ color: "#c8a96e" }}>Days</strong> in Plan Itinerary and tap Generate itinerary.</>
+                 )}
+                 {!travelDates && (
+                   <span> Add a <strong style={{ color: "#c8a96e" }}>Start date</strong> to see weekday + calendar dates on each day.</span>
+                 )}
+               </p>
+
+               {holidayBriefing?.loading && (
+                 <p style={{ color: "#8a7d66", fontSize: "14px", marginBottom: "16px" }}>Looking up weather and packing ideas for your dates…</p>
+               )}
+               {holidayBriefing && !holidayBriefing.loading && holidayBriefing.packing_advice && (
+                 <div
+                   style={{
+                     background: "#1a1810",
+                     border: "1px solid #c8a96e44",
+                     borderRadius: "12px",
+                     padding: "16px",
+                     marginBottom: "20px",
+                   }}
+                 >
+                   <h3 style={{ fontFamily: "'Playfair Display', serif", color: "#c8a96e", fontSize: "17px", marginBottom: "10px" }}>
+                     Weather & what to pack
+                   </h3>
+                   <div style={{ color: "#ddd5c0", fontSize: "14px", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                     {holidayBriefing.packing_advice}
+                   </div>
+                 </div>
+               )}
+               {holidayBriefing && !holidayBriefing.loading && holidayBriefing.error && !holidayBriefing.packing_advice && (
+                 <p style={{ color: "#b08070", fontSize: "14px", marginBottom: "16px" }}>{holidayBriefing.error}</p>
+               )}
+               
+               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                 <button onClick={() => setActiveTab('places')} style={{ background: activeTab === 'places' ? '#8b6914' : '#2a2820', color: activeTab === 'places' ? '#0f0e0b' : '#f0ead6', border: 'none', padding: '6px 14px', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer' }}>All Places</button>
+                 <button onClick={() => setActiveTab('eats')} style={{ background: activeTab === 'eats' ? '#8b6914' : '#2a2820', color: activeTab === 'eats' ? '#0f0e0b' : '#f0ead6', border: 'none', padding: '6px 14px', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer' }}>Must Eats</button>
+                 <button onClick={() => setActiveTab('itinerary')} style={{ background: activeTab === 'itinerary' ? '#8b6914' : '#2a2820', color: activeTab === 'itinerary' ? '#0f0e0b' : '#f0ead6', border: 'none', padding: '6px 14px', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer' }}>Day-to-Day</button>
+               </div>
+
+               {actionPlan.length === 0 ? (
+                 <p style={{ color: "#8a7d66" }}>Your itinerary is empty or finished! Switch to Plan Itinerary and tap Generate itinerary.</p>
+               ) : (
+                 <>
+                   {(activeTab === 'places' || activeTab === 'eats') && (
+                     actionPlan.filter(n => activeTab === 'places' ? n.type === 'place' : n.type === 'eat').map(node => (
+                       <div key={node.id} style={{ background: "#1a1810", border: "1px solid #2a2820", padding: "16px", borderRadius: "12px", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                         <div>
+                           <h3 style={{ fontSize: "16px", color: "#f0ead6", marginBottom: "4px" }}>{node.title}</h3>
+                           <p style={{ fontSize: "13px", color: "#8a7d66", maxWidth: "450px" }}>{node.anecdote}</p>
+                         </div>
+                         <button 
+                           onClick={() => handleMarkCovered(node.id, node.title)}
+                           style={{ background: "#2a2820", color: "#c8a96e", border: "1px solid #c8a96e44", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
+                           ✓ Covered
+                         </button>
+                       </div>
+                     ))
+                   )}
+                   {activeTab === 'itinerary' && itineraryMap && itineraryMap.map((dayInfo) => {
+                     const calendarLine = formatTripDayHeading(travelDates, dayInfo.day);
+                     return (
+                     <div key={dayInfo.day} style={{ marginBottom: '24px' }}>
+                       <h3 style={{ color: '#c8a96e', marginBottom: '6px', borderBottom: '1px solid #c8a96e44', paddingBottom: '8px', fontSize: '17px' }}>
+                         Day {dayInfo.day}
+                         {calendarLine ? (
+                           <span style={{ color: '#c4b69a', fontWeight: 'normal', fontSize: '15px' }}> · {calendarLine}</span>
+                         ) : null}
+                       </h3>
+                       {dayInfo.locality ? (
+                         <p style={{ color: '#8a7d66', fontSize: '13px', margin: '0 0 12px', lineHeight: 1.45 }}>
+                           <strong style={{ color: '#c4b69a', fontWeight: 600 }}>Area focus:</strong> {dayInfo.locality} — same-day stops are grouped for walking this neighborhood.
+                         </p>
+                       ) : null}
+                       {dayInfo.plan.map(nodeId => {
+                         const node = actionPlan.find(n => n.id === nodeId);
+                         if (!node) return null; // Already covered!
+                         return (
+                           <div key={node.id} style={{ background: "#2a2820", padding: "12px", borderRadius: "8px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+                             <span style={{ color: '#f0ead6', fontWeight: 'bold' }}>{node.title} <span style={{ color: '#8a7d66', fontSize: '11px', marginLeft: '8px', textTransform: 'uppercase' }}>{node.type}</span></span>
+                             <button onClick={() => handleMarkCovered(node.id, node.title)} style={{ background: "transparent", color: "#c8a96e", border: "1px solid #c8a96e44", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>✓ Covered</button>
+                           </div>
+                         );
+                       })}
+                     </div>
+                   );
+                   })}
+                 </>
+               )}
+             </div>
+          ) : isEmpty ? (
             <div className="welcome">
               <h1>Explore Like a Local</h1>
               <p>I know the spots that don't show up on travel blogs — the century-old tea stall, the mural with a story, the $4 meal that locals swear by.</p>
@@ -364,21 +992,23 @@ export default function WalkieTalkie() {
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`message ${msg.role}`}>
-                <div className={`avatar ${msg.role === "assistant" ? "ai" : "user"}`}>
-                  {msg.role === "assistant" ? "🗺️" : "✈️"}
+              msg.hidden ? null : (
+                <div key={i} className={`message ${msg.role}`}>
+                  <div className={`avatar ${msg.role === "assistant" ? "ai" : "user"}`}>
+                    {msg.role === "assistant" ? "🗺️" : "✈️"}
+                  </div>
+                  <div className={`bubble ${msg.role === "assistant" ? "ai" : "user"}`}>
+                    {msg.preview && <img src={msg.preview} alt="uploaded" className="img-preview" />}
+                    {msg.role === "assistant"
+                      ? <div dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
+                      : <span>{msg.text}</span>
+                    }
+                  </div>
                 </div>
-                <div className={`bubble ${msg.role === "assistant" ? "ai" : "user"}`}>
-                  {msg.preview && <img src={msg.preview} alt="uploaded" className="img-preview" />}
-                  {msg.role === "assistant"
-                    ? <div dangerouslySetInnerHTML={{ __html: formatText(msg.content) }} />
-                    : <span>{msg.text}</span>
-                  }
-                </div>
-              </div>
+              )
             ))
           )}
-          {loading && (
+          {loading && tripMode === "planning" && (
             <div className="message">
               <div className="avatar ai">🗺️</div>
               <div className="bubble ai">
@@ -391,8 +1021,9 @@ export default function WalkieTalkie() {
           <div ref={bottomRef} />
         </div>
 
-        <div className="input-area">
-          <div className="input-wrap">
+        {tripMode === "planning" && (
+          <div className="input-area">
+            <div className="input-wrap">
             <div style={{ flex: 1 }}>
               {imagePreview && (
                 <div className="img-attach-preview">
@@ -421,6 +1052,9 @@ export default function WalkieTalkie() {
             </button>
           </div>
           <div className="hint">Upload photos of menus, murals, or buildings for instant local insight</div>
+        </div>
+        )}
+        </div>
         </div>
       </div>
     </div>

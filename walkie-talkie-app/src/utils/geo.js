@@ -14,17 +14,3 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-export async function fetchWalkingRoute(coordinates) {
-    if (!coordinates || coordinates.length < 2) return null;
-    const coordString = coordinates.map(c => `${c.lng},${c.lat}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/foot/${coordString}?overview=full&geometries=geojson&steps=true`;
-    
-    try {
-        const res = await fetch(url);
-        const data = await res.json();
-        return data;
-    } catch(e) {
-        console.error("OSRM Routing Error:", e);
-        return null;
-    }
-}

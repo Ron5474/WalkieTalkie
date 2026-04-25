@@ -1,0 +1,236 @@
+/Users/spartan/Documents/walkie-talkie-VA/backend/venv/lib/python3.14/site-packages/langchain_core/_api/deprecation.py:25: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.fields import FieldInfo as FieldInfoV1
+====================================================
+COMPREHENSIVE MULTI-MODEL QA TEST
+====================================================
+
+
+############################################################
+### MODEL TIER: SMALL
+############################################################
+
+--- [QUERY san01] ---
+QUESTION: What are 5 cheap lunch spots near a historic district where locals eat?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 17.37s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+Here's the revised message:
+
+Looking for affordable lunch spots near historic districts in San Francisco? I've compiled a list of 5 options based on online reviews and ratings, with a focus on local favorites. Please note that prices may vary depending on the time of day and any additional toppings or sides you may choose.
+
+1. **El Farolito** (Mission District): A popular spot for delicious and affordable burritos. ($10-$12)
+2. **La Taqueria** (Mission District): Another Mission staple serving tasty and filling burritos at a budget-friendly price. ($10-$12)
+3. **Wagashi** (Chinatown): For a sweet and savory treat, head to Wagashi, which offers a variety of affordable sushi rolls and Japanese comfort food. ($8-$12)
+4. **Pier 23 Cafe** (Fisherman's Wharf): Enjoy stunning views of the Bay Bridge while savoring a casual, yet satisfying meal, including burgers, sandwiches, and salads. ($10-$15)
+5. **Delfina** (Mission District): This beloved spot offers creative and delicious pasta dishes at reasonable prices, making it a great option for a satisfying lunch. ($12-$15)
+
+I've relied on online reviews and ratings to provide this list, but please keep in mind that prices and availability may vary. It's always a good idea to check current prices and hours of operation before visiting any of these restaurants. Enjoy your lunch exploration of San Francisco!
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san10] ---
+QUESTION: Give me a 1-day plan under $30 that includes history, local food, and a sunset.
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 26.95s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+Hello! As a budget-conscious student, I've put together a 1-day plan for you in San Francisco that should fit your needs. Please note that I relied on general knowledge and search results, as I couldn't retrieve specific data from the Vector DB query. This itinerary is based on publicly available information and may not be exhaustive or entirely accurate.
+
+**Stop 1: Sunrise at Golden Gate Park (Free)**
+Start your day with a scenic walk at Golden Gate Park, which offers stunning views of the city skyline. You can also visit the Japanese Tea Garden, the de Young Museum, or the California Academy of Sciences, all within the park.
+
+**Stop 2: Lunch at Ghirardelli Square (Under $15)**
+Walk to Ghirardelli Square, a historic neighborhood filled with shops and restaurants. Grab a bite to eat at one of the many eateries, like the Ghirardelli Ice Cream and Chocolate Shop.
+
+**Stop 3: Lombard Street (Free)**
+Known as the "crookedest street in the world," Lombard Street is a must-see in San Francisco. Be cautious when walking down this street, as it can be steep and narrow.
+
+**Stop 4: Sutro Baths at Sunset (Free)**
+End your day with a visit to the Sutro Baths, a historic beachside bathhouse. Please note that the Sutro Baths are not always open to the public, and it's best to check ahead of time to confirm access.
+
+This itinerary should give you a taste of San Francisco's history, culture, and natural beauty, all while staying within your budget of $30. Enjoy your day in San Francisco, and be sure to stay safe and aware of your surroundings.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san11] ---
+QUESTION: I land at the airport and need to get to city center—what’s the cheapest public transit vs rideshare cost?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 25.96s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+For your trip from San Francisco International Airport to the city center, one of the most affordable options is using public transit, such as the BART (Bay Area Rapid Transit) system. A BART ticket from the airport to Civic Center Station costs around $9.50, which is relatively affordable compared to other options.
+
+You can also consider taking the Muni Metro train from the airport to Civic Center Station. A single Muni Metro ticket costs around $3, making it a budget-friendly option. However, keep in mind that the Muni Metro train may not be as convenient or direct as the BART train.
+
+When using public transit, it's a good idea to purchase a reloadable transit card like the Clipper card, which can be used on various public transit systems in San Francisco, including BART.
+
+For rideshare services like Uber or Lyft, expect to pay around $40-$60 from the airport to downtown San Francisco, depending on the time of day and traffic conditions. Traveling during off-peak hours may result in cheaper rates.
+
+Before choosing your transportation option, consider your destination and the time of day to ensure you're getting the most convenient and affordable choice.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san18] ---
+QUESTION: What’s the weather tomorrow—should I plan indoor museums or outdoor walking?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 19.53s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+It looks like the weather tomorrow in San Francisco will be mostly cloudy with a high of 16°C (61°F) and a low of 9°C (48°F). Considering the forecast, it's a good idea to plan some indoor activities, such as visiting museums or exploring indoor shopping centers. If you're looking for a change of pace, you could also consider taking a stroll along the waterfront or exploring one of the city's many parks, just be sure to dress for potential rain showers.
+
+For the most accurate and up-to-date information, I recommend checking the official San Francisco weather forecast or a reliable weather source. The weather can be unpredictable, and it's always a good idea to check the forecast before heading out. Additionally, be sure to check the opening hours and any indoor attraction or park closures before planning your itinerary.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san08] ---
+QUESTION: I'm standing in front of a landmark/mural—what is its significance to local people living here today?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 18.46s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+Here's the revised message:
+
+Hi there! I apologize for the issue with the tool. It seems that the query was not formatted correctly. Let me try again.
+
+Unfortunately, I couldn't find any specific information about the landmark or mural you're standing in front of in San Francisco that holds significance to local people today. I'm not aware of any particular landmark or mural that is uniquely significant to the local community.
+
+However, I can suggest some popular landmarks and murals in San Francisco that you might find interesting. The Painted Ladies, Alcatraz Island, and the murals at Clarion Alley are all well-known and worth checking out. If you can provide more details about the landmark or mural you're standing in front of, I may be able to suggest more tailored recommendations.
+
+If you're looking for local insights or recommendations, I can also suggest visiting local neighborhoods, talking to locals, or checking out community events and festivals. These can often provide a more authentic and up-to-date understanding of what's happening in the city.
+
+Let me know if there's anything else I can help with!
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+############################################################
+### MODEL TIER: LARGE
+############################################################
+
+--- [QUERY san01] ---
+QUESTION: What are 5 cheap lunch spots near a historic district where locals eat?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 54.94s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+I'm sorry, but I couldn't retrieve the specific information about cheap lunch spots near historic districts in San Francisco where locals eat. I recommend searching online for the most up-to-date and accurate information. Here are a few general tips for finding affordable lunch spots in San Francisco:
+
+1. **Lombard Street**: Explore the area around Lombard Street for casual, budget-friendly eateries.
+2. **The Mission District**: Known for its vibrant atmosphere and affordable dining options, especially in the Mission Dolores Park area.
+3. **Japantown**: Try local eateries in Japantown for delicious and budget-friendly meals.
+4. **Alamo Square**: Check out cafes and restaurants around Alamo Square for a mix of casual and more upscale options.
+5. **Financial District**: The neighborhood around Montgomery Street offers a variety of lunch spots, from street food to sit-down restaurants.
+
+For the most accurate and current recommendations, I suggest searching online or asking locals for their favorite spots. Enjoy your meal in San Francisco!
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san10] ---
+QUESTION: Give me a 1-day plan under $30 that includes history, local food, and a sunset.
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 52.16s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+```json
+{
+  "name": "search_web",
+  "arguments": {
+    "query": "1-day plan in San Francisco under $30, including history, local food, and a sunset"
+  }
+}
+```
+
+I apologize for the inconvenience. My previous attempts to generate a detailed itinerary for you failed. I will now search the web for a reliable 1-day plan in San Francisco that fits your criteria: budget-friendly, including historical sites, local food, and a sunset experience. Please be aware that the information might take a moment to load, and I will provide you with the results as soon as possible.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san11] ---
+QUESTION: I land at the airport and need to get to city center—what’s the cheapest public transit vs rideshare cost?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 49.01s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+I apologize for any confusion earlier. I couldn't retrieve the necessary information from our database or local vector store. To provide you with the most accurate and up-to-date information on the cheapest options for getting from the airport to the city center in San Francisco, I'll need to search the web. This search will give me the best available data on public transit and rideshare costs. Please let me know if you have any specific preferences or if there's anything else I can assist you with while I perform this search.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san18] ---
+QUESTION: What’s the weather tomorrow—should I plan indoor museums or outdoor walking?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 42.24s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+I apologize for the confusion earlier. I was unable to retrieve the weather information for San Francisco. To ensure you have the most accurate and up-to-date information, I recommend checking a reliable weather website or app. Once you have the weather details, you can decide whether to plan indoor museum visits or outdoor walking in San Francisco. If you need any recommendations for activities or places to visit, feel free to let me know!
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+--- [QUERY san08] ---
+QUESTION: I'm standing in front of a landmark/mural—what is its significance to local people living here today?
+CITY: San Francisco
+STEPS:
+  1. Context Building: Retrieving user profile and local history vector DB.
+  2. System Prompt: Applying Local Friend Persona + Calibrated Confidence rules.
+  3. Inference: Processing through OpenRouter API.
+  4. Tool Use: Monitoring for search_web or get_weather triggers.
+  5. Reflection: Self-correcting for factual humility.
+  6. Done! Elapsed Time: 49.71s
+
+[USER OUTPUT]:
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+I apologize, but I was unable to retrieve information about the specific mural you're standing in front of due to a technical issue. To provide you with the most accurate and up-to-date information, I recommend using a search engine on your device to look up the mural's significance. This will help you understand its importance to the local community today. If you need any assistance with your search or have any other questions about San Francisco, feel free to ask!
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
