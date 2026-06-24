@@ -30,11 +30,15 @@ node_modules/
 *.db
 backend/chroma_db/
 
+# Tunneling binary (download locally, don't commit)
+backend/cloudflared
+backend/cloudflared.tgz
+
 # Evaluation results and test artifacts
 evaluation/results/
 evaluation/*.jsonl
 evaluation/*.json
-evaluation/*_results.txt
+*_results.txt
 
 # OS/editor clutter
 .DS_Store

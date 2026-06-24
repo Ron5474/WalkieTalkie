@@ -371,7 +371,7 @@ FORCE_OLLAMA_FALLBACK=false  # Use OpenRouter
 - If > 0%: Check API key, rate limits, network
 
 ### Quality Metrics
-See `evaluation/FINAL_MODEL_COMPARISON.md` for detailed comparison
+See `../docs/reports/FINAL_MODEL_COMPARISON.md` for detailed comparison
 
 ---
 
