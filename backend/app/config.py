@@ -1,14 +1,14 @@
 """Environment-driven settings for OpenRouter (chat/vision) + optional embeddings."""
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Always load backend/.env, regardless of process working directory.
-_ENV_PATH = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=_ENV_PATH)
+from app.paths import ENV_PATH
 
-        
+# Always load backend/.env, regardless of process working directory.
+load_dotenv(dotenv_path=ENV_PATH)
+
+
 def openrouter_api_key() -> str:
     return (os.getenv("OPENROUTER_API_KEY") or "").strip()
 

@@ -2,25 +2,31 @@
 from __future__ import annotations
 
 import logging
-import json
 from typing import Literal
+
 from langchain_core.messages import AIMessage, HumanMessage
 
-from llm_factory import get_chat_llm
-from prompting import (
+from app.llm.factory import get_chat_llm
+from app.services.prompting import (
     apply_self_reflection,
     build_chained_context,
     build_system_prompt,
     persona_instructions,
     strip_editor_meta_from_user_text,
 )
-from tools import fetch_user_profile, get_weather, record_visited_place, search_local_history, search_web
+from app.tools import (
+    fetch_user_profile,
+    get_weather,
+    record_visited_place,
+    search_local_history,
+    search_web,
+)
 
 TOOLS = [search_local_history, fetch_user_profile, record_visited_place, search_web, get_weather]
 
 PromptingMode = Literal["regular", "meta", "chaining", "self_reflection"]
 _agents: dict[str, object] = {}
-logger = logging.getLogger("walkietalkie.agent_runner")
+logger = logging.getLogger("walkietalkie.chat_service")
 MAX_HISTORY_MESSAGES = 14
 MAX_CHARS_PER_MESSAGE = 4000
 MAX_TOTAL_CHARS = 24000

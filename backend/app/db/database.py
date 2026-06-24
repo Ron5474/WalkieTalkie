@@ -1,10 +1,11 @@
 import sqlite3
-import os
 import secrets
 import time
 from typing import Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "walkie_talkie.db")
+from app.paths import DB_PATH as _DB_PATH
+
+DB_PATH = str(_DB_PATH)
 
 
 def canonicalize_user_id(user_id: str) -> str:
@@ -66,7 +67,7 @@ def init_db():
             error TEXT
         )
     ''')
-    
+
     # Best-effort schema evolution for existing DBs that may not have these columns.
     for alter_sql in (
         "ALTER TABLE users ADD COLUMN display_name TEXT",

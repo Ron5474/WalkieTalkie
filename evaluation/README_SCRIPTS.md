@@ -150,20 +150,20 @@ kol01, kol02, kol06, kol07, kol11, kol16, kol18 (Kolkata)
 
 ## 🧪 Interactive QA Scripts
 
-### `auth_isolation_qa.py` - Multi-User Session Testing
+### `tests/test_auth_isolation.py` - Multi-User Session Testing
 
 **Purpose**: Test user isolation, profile persistence, and session management
 
 **Prerequisites**:
 - Backend running on `http://127.0.0.1:8001`
   ```bash
-  uvicorn main:app --port 8001
+  uvicorn app.main:app --port 8001
   ```
 
 **Usage**:
 ```bash
 cd backend
-python auth_isolation_qa.py
+python tests/test_auth_isolation.py
 ```
 
 **Tests**:
@@ -190,14 +190,14 @@ python auth_isolation_qa.py
 
 ---
 
-### `comprehensive_qa.py` - Interactive Model Query Testing
+### `tests/test_comprehensive.py` - Interactive Model Query Testing
 
 **Purpose**: Test specific queries against both model tiers with detailed output
 
 **Usage**:
 ```bash
 cd backend
-python comprehensive_qa.py
+python tests/test_comprehensive.py
 ```
 
 **Tests** (hardcoded query IDs):
@@ -330,15 +330,15 @@ python analyze_results.py
 ```bash
 # Terminal 1: Start backend on port 8001
 cd backend && source venv/bin/activate
-uvicorn main:app --port 8001
+uvicorn app.main:app --port 8001
 
 # Terminal 2: Run multi-user session tests
 cd backend
-python auth_isolation_qa.py
+python tests/test_auth_isolation.py
 
 # Terminal 3: Run interactive query tests
 cd backend
-python comprehensive_qa.py
+python tests/test_comprehensive.py
 ```
 
 ---
@@ -381,7 +381,7 @@ See `../docs/reports/FINAL_MODEL_COMPARISON.md` for detailed comparison
 **Solution**: Start backend
 ```bash
 cd backend && source venv/bin/activate
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 ### Error: "Rate limit exceeded"
@@ -404,8 +404,8 @@ uvicorn main:app --reload --port 8000
 | `analyze_results.py` | Result analysis | N/A | Post-eval analysis |
 | `summarize_eval.py` | JSON summary | N/A | Metrics export |
 | `slice_queries.py` | Split queries | N/A | Quick testing |
-| `auth_isolation_qa.py` | Auth testing | N/A | Multi-user validation |
-| `comprehensive_qa.py` | Manual testing | 5 (hardcoded) | Interactive debugging |
+| `tests/test_auth_isolation.py` | Auth testing | N/A | Multi-user validation |
+| `tests/test_comprehensive.py` | Manual testing | 5 (hardcoded) | Interactive debugging |
 | `generate_queries.py` | Generate query set | N/A | Create new test suite |
 
 ---

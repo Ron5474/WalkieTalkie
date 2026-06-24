@@ -4,7 +4,7 @@ from __future__ import annotations
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-import config
+from app import config
 
 _embeddings: OpenAIEmbeddings | OllamaEmbeddings | None = None
 

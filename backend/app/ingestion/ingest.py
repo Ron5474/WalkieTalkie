@@ -2,7 +2,7 @@
 Dynamic + curated ingestion for city knowledge into ChromaDB.
 
 Run from `backend/`:
-  python ingest_data.py
+  python scripts/ingest_cities.py
 """
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ import chromadb
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 
-from llm_factory import get_embedding_model
-from database import set_city_index_status
+from app.llm.factory import get_embedding_model
+from app.db.database import set_city_index_status
+from app.paths import CHROMA_DIR, DATA_DIR
 
 URLS_SF = [
     "https://49miles.com/2022/a-brief-history-of-san-francisco-everything-you-need-to-know/",
@@ -24,8 +25,8 @@ URLS_SF = [
     "https://sfcityguides.org/find-your-tour/",
 ]
 
-KOLKATA_FILE = os.path.join(os.path.dirname(__file__), "data", "kolkata_seed.txt")
-DB_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
+KOLKATA_FILE = str(DATA_DIR / "kolkata_seed.txt")
+DB_PATH = str(CHROMA_DIR)
 COLLECTION_NAME = "local_stories"
 
 QUERY_TEMPLATES = [
@@ -206,18 +207,3 @@ def ingest_city(city: str, max_sources: int = 8) -> dict:
         "chunk_count": inserted,
         "sources": [d["source"] for d in documents],
     }
-
-
-def main():
-    import config
-
-    config.assert_api_config()
-
-    for city in ("San Francisco", "Kolkata"):
-        print(f"Ingesting city: {city}")
-        result = ingest_city(city)
-        print(result)
-
-
-if __name__ == "__main__":
-    main()

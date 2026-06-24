@@ -2,7 +2,7 @@
 Quick multi-user auth/session isolation QA.
 
 Run (with backend server running on :8001):
-  .\\.venv\\Scripts\\python.exe auth_isolation_qa.py
+  python tests/test_auth_isolation.py
 """
 from __future__ import annotations
 
