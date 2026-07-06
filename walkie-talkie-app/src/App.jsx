@@ -92,7 +92,6 @@ export default function WalkieTalkie() {
     } catch {
       // Ignore corrupted local storage payloads.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -178,7 +177,6 @@ export default function WalkieTalkie() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once on load from IndexedDB
   }, []);
 
   const handleGenerateItinerary = async () => {
