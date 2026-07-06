@@ -1,0 +1,1 @@
+"""WalkieTalkie backend application package."""

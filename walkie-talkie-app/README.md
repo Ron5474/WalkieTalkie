@@ -233,7 +233,7 @@ Checks code against ESLint rules (see `eslint.config.js`).
 **Cause**: Backend not running or proxy misconfigured
 
 **Fix**:
-1. Start backend: `cd backend && uvicorn main:app --reload --port 8000`
+1. Start backend: `cd backend && uvicorn app.main:app --reload --port 8000`
 2. Check `vite.config.js` proxy target (should be `8000`)
 3. Restart dev server: `npm run dev`
 4. Verify via browser console: `fetch('/api/health').then(r => r.json())`

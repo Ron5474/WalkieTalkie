@@ -28,7 +28,7 @@ os.chdir(BACKEND)
 
 from langchain_core.messages import HumanMessage  # noqa: E402
 
-from agent_runner import run_chat_turn  # noqa: E402
+from app.services.chat_service import run_chat_turn  # noqa: E402
 
 CITY_GPS = {
     "San Francisco": (37.7955, -122.3937),

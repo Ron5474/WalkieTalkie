@@ -1,4 +1,4 @@
-"""Quick latency probe: same chat turn twice, prints elapsed seconds from agent_runner."""
+"""Quick latency probe: same chat turn twice, prints elapsed seconds from chat_service."""
 import os
 import sys
 
@@ -7,7 +7,7 @@ os.chdir(os.path.dirname(os.path.dirname(__file__)))
 
 from langchain_core.messages import HumanMessage
 
-from agent_runner import run_chat_turn
+from app.services.chat_service import run_chat_turn
 
 
 def main():

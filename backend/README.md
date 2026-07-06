@@ -79,7 +79,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 Populate the vector database with curated stories and landmarks:
 
 ```bash
-python ingest_data.py
+python scripts/ingest_cities.py
 ```
 
 This:
@@ -93,7 +93,7 @@ This:
 ## Running the Server
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 The API will be available at `http://localhost:8000`
@@ -150,7 +150,7 @@ curl "http://localhost:8000/api/nearby?lat=37.7749&lon=-122.4194&city=San%20Fran
 
 ### Testing Auth Isolation
 ```bash
-python auth_isolation_qa.py
+python tests/test_auth_isolation.py
 ```
 
 Tests:
@@ -187,7 +187,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 ### Rebuilding the DB
 ```bash
 rm -rf chroma_db/
-python ingest_data.py  # Regenerate with current embeddings
+python scripts/ingest_cities.py  # Regenerate with current embeddings
 ```
 
 ## Troubleshooting
@@ -210,7 +210,7 @@ python ingest_data.py  # Regenerate with current embeddings
 **Fix**:
 ```bash
 rm -rf chroma_db/
-python ingest_data.py
+python scripts/ingest_cities.py
 ```
 
 ### Frontend Proxy Errors
@@ -224,20 +224,40 @@ python ingest_data.py
 
 ```
 backend/
-├── main.py              # FastAPI app, routes
-├── config.py            # Hero cities, model defaults, config loader
-├── database.py          # SQLite & Chroma operations
-├── llm_factory.py       # LLM/embeddings initialization
-├── prompting.py         # System prompts, chat logic
-├── tools.py             # Weather, search, tool definitions
-├── ingest_data.py       # Populate vector DB
-├── auth_isolation_qa.py # Multi-user QA script
-├── requirements.txt     # Python dependencies
-├── .env.example         # Template (copy to .env)
-├── data/                # Seed data
-│   └── kolkata_seed.txt # Kolkata landmarks
-└── chroma_db/           # Vector store (auto-created)
-    ├── chroma.sqlite3   # Main DB file
+├── app/                     # Application package
+│   ├── main.py              # FastAPI app + router wiring (thin)
+│   ├── config.py            # Hero cities, model defaults, config loader
+│   ├── paths.py             # Filesystem paths anchored at backend root
+│   ├── api/                 # HTTP routers
+│   │   ├── chat.py          # /api/chat
+│   │   ├── itinerary.py     # /api/synthesize-itinerary, /holiday-briefing, /walk-story
+│   │   ├── auth.py          # /api/auth/*, /api/user/*, /api/chat/history
+│   │   ├── city.py          # /api/city/warmup, /api/city/status
+│   │   └── health.py        # /, /api/health, /api/qa/status
+│   ├── schemas/             # Pydantic request models
+│   ├── services/            # Business logic
+│   │   ├── chat_service.py  # Tool-calling loop (run_chat_turn)
+│   │   ├── itinerary_service.py
+│   │   ├── image_research.py
+│   │   ├── warmup.py
+│   │   └── prompting.py     # System prompts, prompting strategies
+│   ├── tools/               # LangChain tools (search, weather, profile, vision, scrape)
+│   ├── llm/factory.py       # LLM/embeddings initialization
+│   ├── db/database.py       # SQLite operations
+│   ├── ingestion/ingest.py  # Vector-DB ingestion
+│   └── utils/               # json_extract, text_cleanup, streaming
+├── scripts/                 # Operational scripts
+│   ├── ingest_cities.py     # Populate vector DB
+│   └── measure_latency.py   # Latency probe
+├── tests/                   # QA scripts
+│   ├── test_auth_isolation.py
+│   └── test_comprehensive.py
+├── requirements.txt         # Python dependencies
+├── .env.example             # Template (copy to .env)
+├── data/                    # Seed data
+│   └── kolkata_seed.txt     # Kolkata landmarks
+└── chroma_db/               # Vector store (auto-created)
+    ├── chroma.sqlite3       # Main DB file
     └── [collection dirs]
 ```
 
@@ -277,7 +297,7 @@ Defined in `config.HERO_CITIES`:
 
 ### Running Tests
 ```bash
-python auth_isolation_qa.py  # Multi-user auth tests
+python tests/test_auth_isolation.py  # Multi-user auth tests
 ```
 
 ### Code Style

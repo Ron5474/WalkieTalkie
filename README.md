@@ -71,7 +71,7 @@ npm run dev
 #### 4. Start Backend API
 ```bash
 # From backend/ directory (with venv activated)
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 **That's it!** Frontend proxy automatically routes `/api/*` to `http://localhost:8000`.
@@ -131,7 +131,7 @@ Populate the vector database with city data:
 ```bash
 cd backend
 # With venv activated:
-python ingest_data.py
+python scripts/ingest_cities.py
 ```
 
 This creates/updates the Chroma SQLite database in `backend/chroma_db/` with:
@@ -147,7 +147,7 @@ This creates/updates the Chroma SQLite database in `backend/chroma_db/` with:
 ```bash
 cd backend
 source venv/bin/activate  # or venv\Scripts\activate on Windows
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 **Terminal 2 – Frontend:**
@@ -174,13 +174,13 @@ For detailed instructions, see [evaluation/README_SCRIPTS.md](evaluation/README_
 **Multi-user auth/session isolation testing**:
 ```bash
 cd backend
-python auth_isolation_qa.py
+python tests/test_auth_isolation.py
 ```
 
 **Interactive query testing (manual verification)**:
 ```bash
 cd backend
-python comprehensive_qa.py
+python tests/test_comprehensive.py
 ```
 
 #### Smoke Testing (Quick Validation)
@@ -212,42 +212,52 @@ npm run build  # Production build to dist/
 
 ```
 WalkieTalkie/
-├── backend/                 # FastAPI server
-│   ├── main.py             # Entry point, routes
-│   ├── config.py           # Config & city definitions
-│   ├── database.py         # SQLite + Chroma operations
-│   ├── llm_factory.py      # LLM/embeddings initialization
-│   ├── prompting.py        # System prompts & chat logic
-│   ├── tools.py            # Weather, search, tool definitions
-│   ├── ingest_data.py      # Populate vector DB
-│   ├── requirements.txt    # Python dependencies
-│   ├── .env.example        # Template for .env
-│   └── chroma_db/          # SQLite vector store (auto-created)
+├── backend/                    # FastAPI server
+│   ├── app/                    # Application package
+│   │   ├── main.py             # FastAPI app + router wiring (thin)
+│   │   ├── config.py           # Config & city definitions
+│   │   ├── paths.py            # Filesystem paths anchored at backend root
+│   │   ├── api/                # HTTP routers (chat, itinerary, auth, city, health)
+│   │   ├── schemas/            # Pydantic request models
+│   │   ├── services/           # Business logic (chat, itinerary, image, warmup, prompting)
+│   │   ├── tools/              # LangChain tools (search, weather, profile, vision, scrape)
+│   │   ├── llm/                # LLM/embeddings factory
+│   │   ├── db/                 # SQLite operations
+│   │   ├── ingestion/          # Vector-DB ingestion
+│   │   └── utils/              # JSON extraction, text cleanup, streaming
+│   ├── scripts/                # Operational scripts (ingest_cities, measure_latency)
+│   ├── tests/                  # QA scripts (auth isolation, comprehensive)
+│   ├── data/                   # Seed data (kolkata_seed.txt)
+│   ├── requirements.txt        # Python dependencies
+│   ├── .env.example            # Template for .env
+│   └── chroma_db/              # SQLite vector store (auto-created, git-ignored)
 │
-├── walkie-talkie-app/       # React + Vite frontend
+├── walkie-talkie-app/          # React + Vite frontend
 │   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── services/       # NarratorService (Web Speech API)
-│   │   ├── hooks/          # useGeolocation hook
-│   │   ├── utils/          # Geo calculations, story templating
-│   │   └── db/             # IndexedDB operations
-│   ├── vite.config.js      # Dev server + proxy config
-│   ├── package.json        # npm dependencies
-│   └── .env.example        # Template for .env
+│   │   ├── components/          # React components
+│   │   ├── services/           # NarratorService (Web Speech API)
+│   │   ├── hooks/              # useGeolocation hook
+│   │   ├── utils/              # Geo calculations, story templating
+│   │   └── db/                 # IndexedDB operations
+│   ├── vite.config.js          # Dev server + proxy config
+│   ├── package.json            # npm dependencies
+│   └── .env.example            # Template for .env
 │
-├── evaluation/             # Test & validation scripts
-│   ├── run_eval.py         # Test harness
-│   ├── queries.yaml        # Test cases
-│   └── results/            # (ignored by git)
+├── evaluation/                 # Eval scripts
+│   ├── run_eval.py             # Test harness
+│   ├── queries.yaml            # Test cases
+│   └── results/                # (ignored by git)
 │
-└── docs/                   # Additional documentation
+└── docs/                       # Additional documentation
+    ├── reports/                # Model-comparison analyses
+    └── deliverables/           # PDFs, notebook, drafts
 ```
 
 ## 🤝 Contributing
 
 1. **Create a feature branch**: `git checkout -b feature/your-feature`
 2. **Make changes** and test locally
-3. **Verify backend tests**: `python backend/auth_isolation_qa.py`
+3. **Verify backend tests**: `python backend/tests/test_auth_isolation.py`
 4. **Build frontend**: `cd walkie-talkie-app && npm run build`
 5. **Commit with clear messages** and push
 
@@ -267,7 +277,7 @@ WalkieTalkie/
 **Solution**:
 1. Get free API key from https://openrouter.ai
 2. Add to `backend/.env`: `OPENROUTER_API_KEY=sk-or-...`
-3. Restart backend: `uvicorn main:app --reload --port 8000`
+3. Restart backend: `uvicorn app.main:app --reload --port 8000`
 
 ### Vector DB Issues
 **Error**: Chroma DB errors on first run
@@ -276,7 +286,7 @@ WalkieTalkie/
 ```bash
 cd backend
 rm -rf chroma_db/  # or rmdir /s chroma_db (Windows)
-python ingest_data.py  # Rebuild
+python scripts/ingest_cities.py  # Rebuild
 ```
 
 ## 📖 Additional Docs
