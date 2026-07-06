@@ -1,2 +1,43 @@
 /* Mobile-first layout + component styles. Classes are added by later tasks.
    Everything below references the tokens in theme.css. */
+
+.message { margin-bottom: 24px; display: flex; gap: 12px; animation: fadeUp 0.3s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.message.user { flex-direction: row-reverse; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.avatar.ai { background: var(--gold-gradient); }
+.avatar.user { background: var(--raised); }
+.bubble { max-width: 78%; padding: 14px 16px; border-radius: 14px; font-size: 14.5px; line-height: 1.7; }
+.bubble.ai { background: var(--surface); border: 1px solid var(--border); color: #ddd5c0; border-radius: 4px 14px 14px 14px; }
+.bubble.user { background: linear-gradient(135deg, #c8a96e22, #8b691422); border: 1px solid #c8a96e33; color: var(--cream); border-radius: 14px 4px 14px 14px; }
+.local-secret { display: block; margin-top: 12px; padding: 10px 12px; background: #c8a96e11; border-left: 2px solid var(--gold); border-radius: 0 8px 8px 0; color: var(--gold); font-style: italic; font-size: 13.5px; }
+.md-table-wrap {
+  margin: 14px 0;
+  overflow-x: auto;
+  border: 1px solid #c8a96e33;
+  border-radius: 10px;
+  background: #16140f;
+}
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.md-table th, .md-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #2f2a20;
+  border-right: 1px solid #2f2a20;
+  vertical-align: top;
+  text-align: left;
+  white-space: normal;
+}
+.md-table th:last-child, .md-table td:last-child { border-right: none; }
+.md-table tbody tr:last-child td { border-bottom: none; }
+.md-table th {
+  color: #d8c59a;
+  font-weight: 700;
+  background: #201c14;
+}
+.md-table td { color: #ddd5c0; }
+.img-preview { max-width: 200px; border-radius: 8px; margin-bottom: 8px; display: block; }
