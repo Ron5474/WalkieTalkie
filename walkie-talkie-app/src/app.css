@@ -85,3 +85,23 @@
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+
+/* TripView: trip controls + action plan */
+.trip-view { max-width: 780px; margin: 0 auto; width: 100%; padding: 16px 14px; overflow-y: auto; }
+.trip-controls { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+.field select, .field input {
+  width: 100%; background: var(--raised); color: var(--cream);
+  border: 1px solid #c8a96e44; padding: 12px; border-radius: 10px; outline: none;
+  font-size: 16px; font-family: inherit; min-height: 44px;
+}
+.btn-primary { background: var(--gold-deep); color: var(--bg); border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.subtab-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.subtab { background: var(--raised); color: var(--cream); border: none; padding: 10px 16px; border-radius: 16px; font-weight: bold; cursor: pointer; min-height: 44px; }
+.subtab.active { background: var(--gold-deep); color: var(--bg); }
+.plan-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-bottom: 12px; }
+.briefing-card { background: var(--surface); border: 1px solid #c8a96e44; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+.day-heading { color: var(--gold); border-bottom: 1px solid #c8a96e44; padding-bottom: 8px; font-size: 17px; margin-bottom: 6px; }
+.covered-btn { background: var(--raised); color: var(--gold); border: 1px solid #c8a96e44; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; min-height: 44px; }
