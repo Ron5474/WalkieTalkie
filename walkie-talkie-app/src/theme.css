@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:wght@300;400;600&display=swap');
+
+:root {
+  --bg: #0f0e0b;
+  --surface: #1a1810;
+  --surface-alt: #12110d;
+  --raised: #2a2820;
+  --gold: #c8a96e;
+  --gold-deep: #8b6914;
+  --cream: #f0ead6;
+  --muted: #8a7d66;
+  --muted-dim: #6b6452;
+  --border: #2a2820;
+  --gold-gradient: linear-gradient(135deg, #c8a96e, #8b6914);
+  --font-head: 'Playfair Display', serif;
+  --font-body: 'Source Serif 4', 'Georgia', serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
