@@ -123,3 +123,40 @@
 .walk-guiding-box { text-align: center; padding: 20px 0; }
 .walk-distance { font-size: 36px; margin: 10px 0; color: var(--gold); }
 .walk-actions {}
+
+/* Sheets: shared slide-up bottom sheet wrapper (Settings, CityHistory, Auth) */
+.sheet-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); z-index: 999;
+  display: flex; align-items: flex-end;
+}
+.sheet-panel {
+  background: var(--surface); border-top: 1px solid #c8a96e55; border-radius: 16px 16px 0 0;
+  width: 100%; max-height: 85vh; overflow-y: auto;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sheet-head h3 { color: var(--gold); font-family: var(--font-head); margin: 0; font-size: 19px; }
+.sheet-close {
+  background: var(--raised); color: var(--cream); border: none; width: 32px; height: 32px;
+  border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+.sheet-body { display: flex; flex-direction: column; gap: 14px; }
+.sheet-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0; }
+.sheet-input {
+  width: 100%; background: var(--bg); color: var(--cream); border: 1px solid #c8a96e44;
+  padding: 12px; border-radius: 10px; outline: none; font-size: 16px; font-family: inherit; min-height: 44px;
+}
+.sheet-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 12px 18px; border-radius: 10px; cursor: pointer; font-weight: bold; min-height: 44px; }
+
+/* City history list (used inside CityHistorySheet) */
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-item {
+  width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
+  border-radius: 10px; color: #c4b69a; padding: 10px; cursor: pointer;
+}
+.history-item:hover { border-color: #c8a96e33; background: #1a1810; }
+.history-item.active { border-color: #c8a96e66; background: #1a1810; }
+.history-city { font-size: 13px; color: #f0ead6; font-weight: 600; margin-bottom: 3px; }
+.history-meta { font-size: 11px; color: #8a7d66; margin-bottom: 2px; }
+.history-preview { font-size: 11px; color: #9f9278; line-height: 1.35; }
