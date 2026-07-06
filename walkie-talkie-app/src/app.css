@@ -57,15 +57,14 @@
 .img-attach-preview { position: relative; margin-bottom: 8px; }
 .img-attach-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #c8a96e44; }
 .remove-img { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 10px; color: var(--bg); font-weight: bold; border: none; }
-.inner-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
+.inner-wrap { display: flex; align-items: flex-end; gap: 2px; padding-left: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; transition: border-color 0.2s; }
 .inner-wrap:focus-within { border-color: #c8a96e55; }
-.attach-row { display: flex; gap: 4px; padding: 8px 10px 0; }
-.attach-btn { background: none; border: none; color: var(--muted-dim); cursor: pointer; padding: 4px; border-radius: 6px; font-size: 18px; min-width: 44px; min-height: 44px; }
+.attach-btn { flex-shrink: 0; background: none; border: none; color: var(--muted-dim); cursor: pointer; border-radius: 50%; font-size: 20px; width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .attach-btn:hover { color: var(--gold); }
 .composer textarea {
-  width: 100%; background: none; border: none; outline: none;
+  flex: 1; min-width: 0; background: none; border: none; outline: none;
   color: var(--cream); font-family: var(--font-body); font-size: 16px;
-  padding: 8px 12px 10px; resize: none; min-height: 44px; max-height: 140px; line-height: 1.5;
+  padding: 11px 12px 11px 2px; resize: none; min-height: 44px; max-height: 140px; line-height: 1.5;
 }
 .composer textarea::placeholder { color: #4a4438; }
 .send-btn {
@@ -190,16 +189,23 @@
 
 /* Responsive scale-up (>=768px): tab bar becomes a left rail, content centers, sheets dock as dialogs */
 @media (min-width: 768px) {
-  .app-shell { flex-direction: row; }
-  .topbar {
-    position: fixed; top: 0; left: 0; right: 0;
+  /* Left nav rail spans full height; top bar + body sit in their own column
+     so the rail never overlaps the top bar (city chip stays visible). */
+  .app-shell {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "rail topbar" "rail body";
   }
   .tabbar {
-    flex-direction: column; border-top: none; border-right: 1px solid var(--border);
-    width: 88px; position: sticky; top: 0; bottom: auto; height: 100dvh; padding-top: 72px;
+    grid-area: rail;
+    flex-direction: column; justify-content: flex-start;
+    border-top: none; border-right: 1px solid var(--border);
+    position: static; height: auto; padding: 12px 0 0;
   }
   .tab { flex: 0 0 auto; }
-  .tab-body { padding-top: 56px; }
+  .topbar { grid-area: topbar; }
+  .tab-body { grid-area: body; min-height: 0; }
   .chat-area, .trip-view, .walk-view { max-width: 820px; }
   .suggestions { grid-template-columns: 1fr 1fr; }
   .sheet-backdrop { align-items: center; justify-content: center; }

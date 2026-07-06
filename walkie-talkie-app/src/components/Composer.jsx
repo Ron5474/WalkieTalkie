@@ -13,10 +13,8 @@ export default function Composer({
             </div>
           )}
           <div className="inner-wrap">
-            <div className="attach-row">
-              <button className="attach-btn" title="Upload image" onClick={onPickImage}>📷</button>
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
-            </div>
+            <button className="attach-btn" title="Upload image" onClick={onPickImage}>📷</button>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
