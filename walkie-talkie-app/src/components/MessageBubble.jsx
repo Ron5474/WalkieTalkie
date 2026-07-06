@@ -10,7 +10,7 @@ function formatText(text) {
     };
     const isSeparatorRow = (line) => {
       const t = line.trim();
-      return isPipeRow(t) && /^[\|\s:\-]+$/.test(t);
+      return isPipeRow(t) && /^[|\s:-]+$/.test(t);
     };
     const splitCells = (line) => {
       const t = line.trim();

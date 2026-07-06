@@ -118,7 +118,7 @@
 .walk-info { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
 .walk-error { color: #ff6b6b; font-size: 14px; }
 .walk-list { max-height: 300px; overflow-y: auto; }
-.walk-node-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--bg); }
+.walk-node-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--surface); }
 .walk-badge { font-size: 10px; background: #c8a96e33; color: var(--gold); padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
 .walk-nav-btn { background: var(--gold); color: var(--bg); border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
 .walk-btn { background: transparent; color: var(--gold); border: 1px solid var(--gold); padding: 8px 16px; border-radius: 8px; cursor: pointer; width: 100%; }

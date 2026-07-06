@@ -26,10 +26,6 @@ export default function WalkView({ city = "this city", areaLabel = null, llmTier
     const [distance, setDistance] = useState(null);
     const [narrating, setNarrating] = useState(null);
 
-    useEffect(() => {
-        loadNodes();
-    }, []);
-
     const loadNodes = async () => {
         const data = await getNodes();
         setNodes(data);
@@ -39,22 +35,6 @@ export default function WalkView({ city = "this city", areaLabel = null, llmTier
         await resetVisited();
         loadNodes();
     };
-
-    useEffect(() => {
-        if (targetNode && location) {
-            const dist = calculateDistance(
-                location.lat,
-                location.lng,
-                targetNode.lat,
-                targetNode.lng
-            );
-            setDistance(Math.round(dist));
-
-            if (dist <= 20 && !targetNode.locked && !narrating) {
-                triggerNarration(targetNode);
-            }
-        }
-    }, [location, targetNode, narrating]);
 
     const triggerNarration = async (node) => {
         setNarrating(node.title);
@@ -93,6 +73,26 @@ export default function WalkView({ city = "this city", areaLabel = null, llmTier
         narrator.cancel();
         setNarrating(null);
     };
+
+    useEffect(() => {
+        loadNodes();
+    }, []);
+
+    useEffect(() => {
+        if (targetNode && location) {
+            const dist = calculateDistance(
+                location.lat,
+                location.lng,
+                targetNode.lat,
+                targetNode.lng
+            );
+            setDistance(Math.round(dist));
+
+            if (dist <= 20 && !targetNode.locked && !narrating) {
+                triggerNarration(targetNode);
+            }
+        }
+    }, [location, targetNode, narrating]);
 
     return (
         <div className="walk-view">

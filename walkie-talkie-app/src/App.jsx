@@ -202,7 +202,7 @@ export default function WalkieTalkie() {
               role: "assistant",
               content:
                 `I've generated a ${numDays}-day itinerary for ${selectedCity}. ` +
-                `Switch to Holiday Mode -> Day-to-Day to see each day.`,
+                `See each day under the Day-to-Day tab.`,
             },
           ]);
         } else {
@@ -440,13 +440,13 @@ export default function WalkieTalkie() {
                   return newMsgs;
                 });
               }
-            } catch (e) {
+            } catch {
               // Ignore JSON parse errors for incomplete chunks
             }
           }
         }
       }
-    } catch (err) {
+    } catch {
       updateCurrentCityMessages((prev) => [
         ...prev,
         { role: "assistant", content: "Could not reach the API backend. Check uvicorn on :8000 and OpenRouter settings in backend/.env." },
@@ -498,7 +498,7 @@ export default function WalkieTalkie() {
           <TripView
             selectedCity={selectedCity} setSelectedCity={setSelectedCity}
             numDaysInput={numDaysInput} setNumDaysInput={setNumDaysInput}
-            numDays={numDays} setNumDays={setNumDays}
+            setNumDays={setNumDays}
             userBudget={userBudget} setUserBudget={setUserBudget}
             saveBudgetPreference={saveBudgetPreference}
             travelDates={travelDates} setTravelDates={setTravelDates}

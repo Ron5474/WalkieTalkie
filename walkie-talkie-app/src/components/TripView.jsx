@@ -17,8 +17,7 @@ function formatTripDayHeading(isoDateStr, dayNum) {
 
 export default function TripView({
   selectedCity, setSelectedCity, numDaysInput, setNumDaysInput,
-  // eslint-disable-next-line no-unused-vars -- part of the shared props interface; not rendered directly in this view
-  numDays, setNumDays,
+  setNumDays,
   userBudget, setUserBudget, saveBudgetPreference, travelDates, setTravelDates,
   loading, onGenerate, actionPlan, itineraryMap, holidayBriefing,
   activeSubTab, setActiveSubTab, onMarkCovered, onDayCheckIn,
@@ -52,7 +51,7 @@ export default function TripView({
           {Array.isArray(itineraryMap) && itineraryMap.length > 0 ? (
             <>Day-to-day shows <strong style={{ color: "var(--gold)" }}>{itineraryMap.length} day{itineraryMap.length === 1 ? "" : "s"}</strong> from your last generated plan.</>
           ) : (
-            <>No multi-day plan loaded yet — set <strong style={{ color: "var(--gold)" }}>Days</strong> in Plan Itinerary and tap Generate itinerary.</>
+            <>No multi-day plan loaded yet — set <strong style={{ color: "var(--gold)" }}>Days</strong> above and tap Generate itinerary.</>
           )}
           {!travelDates && (
             <span> Add a <strong style={{ color: "var(--gold)" }}>Start date</strong> to see weekday + calendar dates on each day.</span>
@@ -84,7 +83,7 @@ export default function TripView({
         </div>
 
         {actionPlan.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>Your itinerary is empty or finished! Switch to Plan Itinerary and tap Generate itinerary.</p>
+          <p style={{ color: "var(--muted)" }}>Your itinerary is empty or finished! Set Days above and tap Generate itinerary.</p>
         ) : (
           <>
             {(activeSubTab === 'places' || activeSubTab === 'eats') && (
