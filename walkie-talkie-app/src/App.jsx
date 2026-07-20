@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 
 import { useGeolocation } from './hooks/useGeolocation';
 import { narrator } from './services/NarratorService';
-import { SYSTEM_PROMPT, VISION_SYSTEM_PROMPT, PROMPT_STRATEGIES, CITIES } from './constants';
+import { PROMPT_STRATEGIES, CITIES } from './constants';
 import TopBar from './components/TopBar';
 import TabBar from './components/TabBar';
 import GuideView from './components/GuideView';
@@ -47,6 +47,9 @@ export default function WalkieTalkie() {
   const [holidayBriefing, setHolidayBriefing] = useState(null);
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
+  // Guards the chat-persistence effect: skip the write that immediately follows a load /
+  // storage-key switch so we never clobber a key with the previous key's stale state.
+  const skipNextChatSaveRef = useRef(false);
   const AUTH_STORAGE_KEY = "walkie_talkie_auth_v1";
   const chatStorageKey = `walkie_talkie_chat_by_city_v1_${sessionUserId || "guest"}`;
 
@@ -94,21 +97,16 @@ export default function WalkieTalkie() {
     }
   }, []);
 
+  // Load persisted chat for the active storage key (on mount and whenever the key changes,
+  // e.g. sign-in/out). Declared BEFORE the save effect so that, on a key change, this runs
+  // first and arms the skip guard before the save effect fires in the same commit.
   useEffect(() => {
-    try {
-      localStorage.setItem(chatStorageKey, JSON.stringify(chatByCity));
-    } catch {
-      // Ignore quota/serialization errors.
-    }
-  }, [chatByCity, chatStorageKey]);
-
-  useEffect(() => {
+    skipNextChatSaveRef.current = true;
     try {
       const raw = localStorage.getItem(chatStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") setChatByCity(parsed);
-        else setChatByCity({});
+        setChatByCity(parsed && typeof parsed === "object" ? parsed : {});
       } else {
         setChatByCity({});
       }
@@ -116,6 +114,20 @@ export default function WalkieTalkie() {
       setChatByCity({});
     }
   }, [chatStorageKey]);
+
+  useEffect(() => {
+    // Skip the write triggered by a load / key switch so stale in-memory state is never
+    // persisted into the freshly-loaded key. Real edits (guard already false) still save.
+    if (skipNextChatSaveRef.current) {
+      skipNextChatSaveRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(chatStorageKey, JSON.stringify(chatByCity));
+    } catch {
+      // Ignore quota/serialization errors.
+    }
+  }, [chatByCity, chatStorageKey]);
 
   const signIn = async () => {
     const uid = (authUserId || "").trim();
@@ -390,10 +402,8 @@ export default function WalkieTalkie() {
         body: JSON.stringify({
           model: hasImage ? "vision" : llmTier,
           llm_tier: llmTier,
-          messages: [
-            { role: "system", content: (hasImage ? VISION_SYSTEM_PROMPT : SYSTEM_PROMPT) + `\n\n[CONTEXT: User focus city is ${selectedCity}; travel dates: ${travelDates || "TBD"}.]` },
-            ...apiMessages
-          ],
+          // The backend owns the system prompt (single source of truth); we only send the turns.
+          messages: apiMessages,
           stream: true,
           latitude: lat,
           longitude: lng,

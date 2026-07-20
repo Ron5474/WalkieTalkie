@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.db.database import get_user_by_session, save_chat_message
 from app.schemas.chat import ChatRequest
@@ -63,8 +63,10 @@ async def chat_endpoint(request: ChatRequest):
 
     for m in request.messages:
         if m.role == "system":
-            # Preserve frontend/system constraints so prompt strategy stays aligned.
-            formatted_messages.append(SystemMessage(content=m.content))
+            # Ignore client-supplied system messages. The backend owns the system prompt
+            # (single source of truth + prevents prompt injection via the system slot).
+            logger.debug("Ignoring client-supplied system message")
+            continue
         elif m.role == "user":
             last_raw_user_message = m.content or ""
             content_str = m.content
