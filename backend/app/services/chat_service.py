@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.llm.factory import get_chat_llm
 from app.services.prompting import (
@@ -32,13 +32,20 @@ MAX_CHARS_PER_MESSAGE = 4000
 MAX_TOTAL_CHARS = 24000
 
 
+def system_prompt_for_mode(mode: PromptingMode) -> str:
+    """Backend-owned system prompt (single source of truth).
+
+    'regular' uses the persona only; every other mode layers the meta constraints
+    (tool discipline, GPS honesty, calibrated confidence) on top.
+    """
+    use_meta_prompt = mode != "regular"
+    return build_system_prompt() if use_meta_prompt else persona_instructions()
+
+
 def get_agent(tier: str, mode: PromptingMode):
     cache_key = f"{tier}:{mode}"
     if cache_key not in _agents:
-        use_meta_prompt = mode != "regular"
-        system_prompt = build_system_prompt() if use_meta_prompt else persona_instructions()
         logger.info("Initializing agent for tier=%s mode=%s", tier, mode)
-
         llm = get_chat_llm(tier)
         # Bind tools to LLM
         llm_with_tools = llm.bind_tools(TOOLS)
@@ -70,6 +77,10 @@ def _sanitize_messages(messages: list) -> list:
     recent = messages[-MAX_HISTORY_MESSAGES:]
     sanitized: list = []
     for m in recent:
+        # The backend injects the authoritative system prompt in run_chat_turn; drop any
+        # other system messages instead of demoting them to AIMessage.
+        if isinstance(m, SystemMessage):
+            continue
         content = getattr(m, "content", "") or ""
         if isinstance(content, list):
             content = str(content)
@@ -129,8 +140,10 @@ def run_chat_turn(
 
     t0 = time.time()
 
-    # Simple tool calling loop
-    messages = list(formatted_messages) if formatted_messages else []
+    # Simple tool calling loop. The backend owns the system prompt: prepend it here so it
+    # can never be overridden or omitted by the client.
+    messages: list = [SystemMessage(content=system_prompt_for_mode(mode))]
+    messages.extend(formatted_messages or [])
     max_iterations = 10
     iteration = 0
 
@@ -145,6 +158,7 @@ def run_chat_turn(
             for tool_call in response.tool_calls:
                 tool_name = tool_call.get('name')
                 tool_input = tool_call.get('args', {})
+                tool_call_id = tool_call.get('id') or f"call_{tool_name}_{iteration}"
                 logger.debug(f"Executing tool: {tool_name} with input: {tool_input}")
 
                 # Find and execute the tool
@@ -160,8 +174,10 @@ def run_chat_turn(
                 if tool_result is None:
                     tool_result = f"Tool {tool_name} not found"
 
-                # Add tool result to messages
-                messages.append(HumanMessage(content=str(tool_result)))
+                # Reply with a ToolMessage keyed by tool_call_id so the assistant's tool_calls
+                # are answered per the provider contract (a HumanMessage here breaks strict
+                # providers and loses the call->result linkage).
+                messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call_id))
         else:
             # No more tool calls, exit loop
             break
