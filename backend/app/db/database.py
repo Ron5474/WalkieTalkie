@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 import secrets
 import time
@@ -14,6 +15,73 @@ def canonicalize_user_id(user_id: str) -> str:
     """
     return (user_id or "").strip().lower()
 
+
+_PBKDF2_ITERATIONS = 200_000
+
+
+def _hash_password(password: str, salt: bytes) -> str:
+    dk = hashlib.pbkdf2_hmac("sha256", (password or "").encode("utf-8"), salt, _PBKDF2_ITERATIONS)
+    return dk.hex()
+
+
+def _verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
+    try:
+        candidate = _hash_password(password, bytes.fromhex(salt_hex))
+    except (ValueError, TypeError):
+        return False
+    return secrets.compare_digest(candidate, hash_hex)
+
+
+def create_user_with_password(
+    username: str,
+    password: str,
+    display_name: Optional[str] = None,
+    budget: Optional[int] = None,
+    dietary: Optional[str] = None,
+    country: Optional[str] = None,
+) -> dict:
+    uid = canonicalize_user_id(username)
+    if not uid:
+        return {"ok": False, "error": "username_required"}
+    if not password or len(password) < 8:
+        return {"ok": False, "error": "weak_password"}
+    salt = secrets.token_bytes(16)
+    pw_hash = _hash_password(password, salt)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (uid,))
+    if cursor.fetchone():
+        conn.close()
+        return {"ok": False, "error": "username_taken"}
+    cursor.execute(
+        """
+        INSERT INTO users (user_id, display_name, budget, dietary_restriction, home_country, password_hash, password_salt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (uid, display_name or uid, budget, dietary, country, pw_hash, salt.hex()),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "user_id": uid}
+
+
+def authenticate_user(username: str, password: str) -> Optional[dict]:
+    uid = canonicalize_user_id(username)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT user_id, password_hash, password_salt, display_name FROM users WHERE user_id = ?",
+        (uid,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row[1] or not row[2]:
+        return None
+    if not _verify_password(password, row[2], row[1]):
+        return None
+    return {"user_id": row[0], "display_name": row[3]}
+
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -24,6 +92,8 @@ def init_db():
             budget INTEGER,
             dietary_restriction TEXT,
             home_country TEXT,
+            password_hash TEXT,
+            password_salt TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')

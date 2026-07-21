@@ -12,3 +12,4 @@ beautifulsoup4
 pyyaml
 ddgs
 pillow
+pytest
