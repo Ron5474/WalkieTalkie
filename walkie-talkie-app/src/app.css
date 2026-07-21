@@ -211,3 +211,11 @@
   .sheet-backdrop { align-items: center; justify-content: center; }
   .sheet-panel { width: min(460px, 92vw); max-height: 80vh; border-radius: 16px; }
 }
+
+.login-screen { display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: 24px; background: var(--bg); }
+.login-card { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; }
+.login-title { color: var(--gold-deep); font-size: 28px; margin: 0; text-align: center; }
+.login-tabs { display: flex; gap: 8px; }
+.login-tab { flex: 1; background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+.login-tab.active { background: var(--gold-deep); color: var(--bg); border-color: var(--gold-deep); }
+.login-error { color: #e5534b; font-size: 13px; margin: 0; }

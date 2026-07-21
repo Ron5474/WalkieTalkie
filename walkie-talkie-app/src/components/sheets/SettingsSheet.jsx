@@ -2,7 +2,7 @@ import Sheet from './Sheet';
 
 export default function SettingsSheet({
   open, onClose, llmTier, setLlmTier, promptStrategy, setPromptStrategy,
-  PROMPT_STRATEGIES, userBudget, setUserBudget, saveBudgetPreference,
+  PROMPT_STRATEGIES, userBudget, setUserBudget, saveBudgetPreference, onLogout,
 }) {
   return (
     <Sheet open={open} onClose={onClose} title="Settings">
@@ -23,6 +23,7 @@ export default function SettingsSheet({
         <input type="number" min={0} value={userBudget}
           onChange={(e) => setUserBudget(e.target.value)} onBlur={saveBudgetPreference} placeholder="USD" />
       </label>
+      <button className="btn-ghost" style={{ width: '100%' }} onClick={onLogout}>Sign out</button>
     </Sheet>
   );
 }
