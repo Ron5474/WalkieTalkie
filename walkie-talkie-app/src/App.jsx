@@ -11,7 +11,7 @@ import TripView from './components/TripView';
 import WalkView from './components/WalkView';
 import SettingsSheet from './components/sheets/SettingsSheet';
 import CityHistorySheet from './components/sheets/CityHistorySheet';
-import AuthSheet from './components/sheets/AuthSheet';
+import LoginScreen from './components/LoginScreen';
 
 export default function WalkieTalkie() {
   const [activeTab, setActiveTab] = useState('guide');
@@ -34,9 +34,6 @@ export default function WalkieTalkie() {
   const [chatByCity, setChatByCity] = useState({});
   const [sessionToken, setSessionToken] = useState(null);
   const [sessionUserId, setSessionUserId] = useState("");
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [hasPromptedGuestSignIn, setHasPromptedGuestSignIn] = useState(false);
-  const [authUserId, setAuthUserId] = useState("");
   const [userBudget, setUserBudget] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,7 +85,6 @@ export default function WalkieTalkie() {
         if (auth?.session_token && auth?.expires_at * 1000 > Date.now()) {
           setSessionToken(auth.session_token);
           setSessionUserId(auth.user_id || "");
-          setAuthUserId(auth.user_id || "");
           if (auth.profile?.budget != null) setUserBudget(String(auth.profile.budget));
         }
       }
@@ -129,28 +125,52 @@ export default function WalkieTalkie() {
     }
   }, [chatByCity, chatStorageKey]);
 
-  const signIn = async () => {
-    const uid = (authUserId || "").trim();
-    if (!uid) return;
-    const budgetNum = parseInt(userBudget, 10);
-    const res = await fetch("/api/auth/signin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: uid,
-        budget: Number.isFinite(budgetNum) ? budgetNum : undefined,
-      }),
+  const ERROR_MESSAGES = {
+    invalid_credentials: 'Incorrect username or password.',
+    username_taken: 'That username is already taken.',
+    weak_password: 'Password must be at least 8 characters.',
+    username_required: 'Username is required.',
+  };
+
+  const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+  });
+
+  const persistSession = (j) => {
+    setSessionToken(j.session_token);
+    setSessionUserId(j.user_id || '');
+    if (j.profile?.budget != null) setUserBudget(String(j.profile.budget));
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(j));
+  };
+
+  const login = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
     });
-    const j = await res.json();
-    if (j?.ok && j.session_token) {
-      setSessionToken(j.session_token);
-      setSessionUserId(j.user_id || uid);
-      if (j.profile?.budget != null) setUserBudget(String(j.profile.budget));
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(j));
-      setIsAuthModalOpen(false);
-      return true;
-    }
-    return false;
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j?.session_token) { persistSession(j); return { ok: true }; }
+    return { ok: false, error: ERROR_MESSAGES[j?.detail] || 'Login failed. Please try again.' };
+  };
+
+  const register = async (username, password, budget) => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, budget }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j?.session_token) { persistSession(j); return { ok: true }; }
+    return { ok: false, error: ERROR_MESSAGES[j?.detail] || 'Registration failed. Please try again.' };
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() });
+    } catch { /* ignore network errors on logout */ }
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setSessionToken(null);
+    setSessionUserId('');
   };
 
   const saveBudgetPreference = async () => {
@@ -159,8 +179,8 @@ export default function WalkieTalkie() {
     if (!Number.isFinite(n)) return;
     await fetch("/api/user/profile", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_token: sessionToken, budget: n }),
+      headers: authHeaders(),
+      body: JSON.stringify({ budget: n }),
     });
   };
 
@@ -283,9 +303,8 @@ export default function WalkieTalkie() {
     if (sessionToken) {
       fetch("/api/user/visited", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
-          session_token: sessionToken,
           city: selectedCity,
           place_name: nodeTitle,
         }),
@@ -316,15 +335,6 @@ export default function WalkieTalkie() {
   };
 
   const sendMessage = async (text, isHidden = false) => {
-    if (!sessionToken && !hasPromptedGuestSignIn) {
-      updateCurrentCityMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Please sign in to keep your conversation history, visited places, and budget preferences synced." },
-      ]);
-      setIsAuthModalOpen(true);
-      setHasPromptedGuestSignIn(true);
-      // Continue as guest so first-time users still get a model response.
-    }
     const userText = (typeof text === 'string' ? text : null) || input.trim();
     if (!userText && !image) return;
 
@@ -398,7 +408,7 @@ export default function WalkieTalkie() {
       const lng = currentGPS?.lng ?? null;
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
           model: hasImage ? "vision" : llmTier,
           llm_tier: llmTier,
@@ -408,11 +418,11 @@ export default function WalkieTalkie() {
           latitude: lat,
           longitude: lng,
           city: selectedCity,
-          session_token: sessionToken,
           prompting_mode: promptStrategy,
         }),
       });
 
+      if (res.status === 401) { await logout(); throw new Error("Session expired"); }
       if (!res.ok) throw new Error("Network response was not ok");
       if (!res.body) throw new Error("No response body");
 
@@ -471,6 +481,10 @@ export default function WalkieTalkie() {
       sendMessage();
     }
   };
+
+  if (!sessionToken) {
+    return <LoginScreen onLogin={login} onRegister={register} />;
+  }
 
   return (
     <div className="app-shell">
@@ -539,12 +553,7 @@ export default function WalkieTalkie() {
         PROMPT_STRATEGIES={PROMPT_STRATEGIES}
         userBudget={userBudget} setUserBudget={setUserBudget}
         saveBudgetPreference={saveBudgetPreference}
-      />
-      <AuthSheet
-        open={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)}
-        authUserId={authUserId} setAuthUserId={setAuthUserId}
-        userBudget={userBudget} setUserBudget={setUserBudget}
-        onSignIn={async () => { const ok = await signIn(); if (ok) setIsAuthModalOpen(false); }}
+        onLogout={logout}
       />
     </div>
   );

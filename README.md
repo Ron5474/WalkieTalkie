@@ -105,6 +105,20 @@ Full documentation available in [backend/README.md](backend/README.md):
 | `OPENWEATHERMAP_API_KEY` | Weather data | — | Optional |
 | `SERPAPI_API_KEY` | Web search & events | — | Optional |
 
+### Authentication
+
+The app is gated by a **username/password login** — the bot and all user features are
+inaccessible until you sign in. On first use, open the app and **Register** a username
+(min 8-character password); after that, **Log in**. The backend returns a session token
+that the frontend sends as an `Authorization: Bearer <token>` header on every
+authenticated request; sessions last 24 hours.
+
+User-scoped tools are bound to the authenticated session, so the assistant can only ever
+read or write **your** profile and visited places — never another user's.
+
+Dev accounts live in `backend/walkie_talkie.db` (gitignored). To reset all accounts,
+stop the server, delete that file, and restart — it recreates an empty schema.
+
 ### Frontend Environment Variables
 
 Edit `walkie-talkie-app/.env` (or `.env.local`):

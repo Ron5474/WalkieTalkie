@@ -117,47 +117,72 @@ curl http://localhost:8000/api/health
 
 ### Core Routes
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/health` | GET | Server status & config |
-| `/api/qa/status` | GET | LLM + embeddings health check |
-| `/api/chat` | POST | Chat with itinerary assistant |
-| `/api/itinerary` | GET | Fetch or generate walking tour |
-| `/api/nearby` | GET | Find stories near location |
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/health` | GET | — | Server status & config |
+| `/api/qa/status` | GET | — | LLM + embeddings health check |
+| `/api/auth/register` | POST | — | Create an account (username + password) → session |
+| `/api/auth/login` | POST | — | Log in → session |
+| `/api/auth/logout` | POST | Bearer | Revoke the current session |
+| `/api/auth/me` | GET | Bearer | Current user |
+| `/api/chat` | POST | Bearer | Chat with the travel assistant |
+| `/api/chat/history` | GET | Bearer | City-scoped chat history |
+| `/api/user/profile` | PATCH | Bearer | Update budget / dietary / country |
+| `/api/user/visited` | POST | Bearer | Record a visited place |
+| `/api/synthesize-itinerary` | POST | — | Generate a walking tour |
+| `/api/holiday-briefing` | POST | — | Weather + packing briefing |
+| `/api/walk-story` | POST | — | Narrated walk story |
 
-### Request/Response Examples
+### Authentication
 
-**Generate Itinerary**:
+The app is gated: every `/api/chat`, `/api/chat/history`, and `/api/user/*` request
+requires a valid session. There is **no anonymous/guest access** and no legacy
+passwordless `/api/auth/signin`.
+
+1. Register (or log in) to obtain a `session_token`:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "password123", "budget": 20}'
+# → {"ok": true, "session_token": "...", "user_id": "alice", "expires_at": ..., "profile": {...}}
+```
+
+2. Send the token as a Bearer header on authenticated routes:
+
 ```bash
 curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "query": "Create a 2-hour walking tour of San Francisco starting from Market Street"
-  }'
+  -H "Authorization: Bearer <session_token>" \
+  -d '{"messages": [{"role": "user", "content": "Plan a cheap afternoon near Market Street"}], "city": "San Francisco"}'
 ```
 
-**Get Nearby Stories**:
-```bash
-curl "http://localhost:8000/api/nearby?lat=37.7749&lon=-122.4194&city=San%20Francisco&radius=500"
-```
+Passwords are hashed with PBKDF2-HMAC-SHA256 (per-user salt). Sessions last 24 hours.
 
 ## Multi-User Session Management
 
-### Profile Persistence
-- Per-user SQLite records: visited places, preferences, budget
-- Auth isolation: each user session gets isolated context
-- Tools for personalization: `record_visited_place`, `update_profile`
+### Accounts & Profiles
+- Accounts are created with a **username + password** (`/api/auth/register`).
+- Per-user SQLite records: visited places, preferences, budget.
+- **User-scoped tools are bound to the authenticated session**: `fetch_user_profile`
+  and `record_visited_place` always act on the logged-in user — the model cannot be
+  prompt-injected into reading or writing another user's data.
 
 ### Testing Auth Isolation
+Start the server, then run the live probe:
 ```bash
-python tests/test_auth_isolation.py
+uvicorn app.main:app --port 8000        # terminal 1
+python tests/test_auth_isolation.py     # terminal 2
 ```
 
-Tests:
-- User sign-in & profile creation
-- Profile updates (budget, preferences)
-- Visited place recording
-- Session logout & data cleanup
+It verifies: registration/login, wrong-password rejection (401), duplicate-registration
+conflict (409), unauthenticated chat rejection (401), and that one user's session cannot
+surface another user's profile through `/api/chat` (`cross_user_leak: false`).
+
+Fast, server-free unit/API tests:
+```bash
+python -m pytest tests/test_auth.py tests/test_auth_api.py tests/test_chat_auth.py
+```
 
 ## Vector Database (Chroma)
 

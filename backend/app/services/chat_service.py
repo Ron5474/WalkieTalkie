@@ -24,6 +24,17 @@ from app.tools import (
 
 TOOLS = [search_local_history, fetch_user_profile, record_visited_place, search_web, get_weather]
 
+# Tools whose first argument identifies the acting user. The server owns this value;
+# it must never come from the model (prompt-injection guard).
+_USER_SCOPED_TOOLS = ("fetch_user_profile", "record_visited_place")
+
+
+def enforce_tool_identity(tool_name: str, tool_input: dict, user_id: str) -> dict:
+    """Force the authenticated user_id onto user-scoped tools, overriding the model."""
+    if tool_name in _USER_SCOPED_TOOLS:
+        return {**tool_input, "user_id": user_id}
+    return tool_input
+
 PromptingMode = Literal["regular", "meta", "chaining", "self_reflection"]
 _agents: dict[str, object] = {}
 logger = logging.getLogger("walkietalkie.chat_service")
@@ -157,7 +168,7 @@ def run_chat_turn(
             # Execute tools
             for tool_call in response.tool_calls:
                 tool_name = tool_call.get('name')
-                tool_input = tool_call.get('args', {})
+                tool_input = enforce_tool_identity(tool_name, tool_call.get('args', {}) or {}, user_id)
                 tool_call_id = tool_call.get('id') or f"call_{tool_name}_{iteration}"
                 logger.debug(f"Executing tool: {tool_name} with input: {tool_input}")
 
