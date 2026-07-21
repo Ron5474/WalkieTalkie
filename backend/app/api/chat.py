@@ -1,9 +1,10 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.api.deps import bearer_token
 from app.db.database import get_user_by_session, save_chat_message
 from app.schemas.chat import ChatRequest
 from app.services.chat_service import run_chat_turn
@@ -36,7 +37,7 @@ def _resolve_prompting_mode(raw_mode: str | None) -> str:
 
 
 @router.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, authorization: str | None = Header(default=None)):
     logger.info("--- NEW REQUEST ---")
     tier = _resolve_tier(request)
     prompting_mode = _resolve_prompting_mode(request.prompting_mode)
@@ -49,8 +50,10 @@ async def chat_endpoint(request: ChatRequest):
         len(request.messages or []),
     )
 
-    session = get_user_by_session((request.session_token or "").strip())
-    user_id = session["user_id"] if session else "guest_local"
+    session = get_user_by_session(bearer_token(authorization))
+    if not session:
+        raise HTTPException(status_code=401, detail="invalid_or_expired_session")
+    user_id = session["user_id"]
     formatted_messages = []
     last_user_msg_idx: int | None = None
 
@@ -114,10 +117,8 @@ async def chat_endpoint(request: ChatRequest):
         user_turn_text = (last_raw_user_message or "").strip()
         if request.messages and request.messages[-1].images:
             user_turn_text = f"{user_turn_text}\n[image_uploaded=true]"
-        # Persist history only for authenticated sessions.
-        if session:
-            save_chat_message(user_id=user_id, city=city, role="user", content=user_turn_text)
-            save_chat_message(user_id=user_id, city=city, role="assistant", content=final_answer)
+        save_chat_message(user_id=user_id, city=city, role="user", content=user_turn_text)
+        save_chat_message(user_id=user_id, city=city, role="assistant", content=final_answer)
         logger.info("generation complete | tier=%s elapsed=%.3fs", tier, generation_time)
         logger.debug("final answer preview: %s", preview(final_answer, 2000))
         return StreamingResponse(stream_response(final_answer), media_type="application/x-ndjson")
